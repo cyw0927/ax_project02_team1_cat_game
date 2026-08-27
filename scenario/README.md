@@ -104,6 +104,29 @@
 
 ---
 
+# 도메인별 TEST_CASES
+
+각 도메인의 `TEST_CASES.md`는 API가 있다는 사실만 확인하지 않고 **정상/실패/동시성/rollback/권한/복구**까지 실제 검증할 항목을 모아둔다.
+
+표기는 공통적으로 다음 의미를 사용한다.
+
+```text
+NOW     = 현재 코드로 테스트 가능
+AFTER   = 해당 기능 구현 후 테스트
+POLICY  = 기획 확정 후 기대값을 고정
+```
+
+- `01_learning_grading/TEST_CASES.md` : 202/PENDING, Docker, 오류/timeout, 보상 중복, test_cases 보안
+- `02_gacha/TEST_CASES.md` : 재화 차감, 결과 지급, rollback, 동시 pull, 중복/천장, LLM ownership
+- `03_battle/TEST_CASES.md` : 방/Ready/Start, 마지막 자리 race, 중복 득점, WebSocket, 재접속, 보상 1회성
+- `04_rank_challenge/TEST_CASES.md` : challenge 생성, autosave, TIMEOUT, SUCCESS/FAILED, 점수/보상 1회성
+- `05_auth/TEST_CASES.md` : 가입/로그인/JWT, 첫 로그인 자동 출석, user_id 위조, 401/403, 비밀정보
+- `06_housing/TEST_CASES.md` : 소유권, 보유수량, 위치 validation, 동시 배치 race, surface, 고양이 연결
+- `07_shop/TEST_CASES.md` : 서버 가격, Atomic 차감, upsert, 동시 구매, rollback, JWT ownership
+- `08_attendance/TEST_CASES.md` : 100원, UNIQUE, 동시 출석, streak, 자동 로그인 출석, 자정/timezone
+
+---
+
 # 상세 시나리오
 
 ## A. 학습·채점
@@ -111,6 +134,7 @@
 - `01_learning_grading/A-01_task_detail_view.md`
 - `01_learning_grading/A-02_to_A-10_detailed.md`
 - `01_learning_grading/API_SPEC_DRAFT.md`
+- `01_learning_grading/TEST_CASES.md`
 
 문제 상세, 코드 제출, PENDING, Docker 채점, 정답/오답/오류/시간초과, 재제출, 중복 보상을 다룬다.
 
@@ -118,6 +142,7 @@
 
 - `02_gacha/B-01_to_B-10_detailed.md`
 - `02_gacha/API_SPEC_DRAFT.md`
+- `02_gacha/TEST_CASES.md`
 
 가챠 화면, 단일/다회, 잔액 부족, 연타, 희귀도, 중복, rollback, 천장을 다룬다.
 
@@ -125,6 +150,7 @@
 
 - `03_battle/C-01_to_C-10_detailed.md`
 - `03_battle/API_SPEC_DRAFT.md`
+- `03_battle/TEST_CASES.md`
 
 방 목록/생성/입장, `FOR UPDATE`, Ready, 시작, 점수, WebSocket, 종료/보상을 다룬다.
 
@@ -132,6 +158,7 @@
 
 - `04_rank_challenge/D-01_to_D-10_detailed.md`
 - `04_rank_challenge/API_SPEC_DRAFT.md`
+- `04_rank_challenge/TEST_CASES.md`
 
 승급전 시작, 중복 시작, 문제 순서, 자동 저장, 이어하기, 제출, TIMEOUT, 성공/실패를 다룬다.
 
@@ -139,6 +166,7 @@
 
 - `05_auth/E-01_to_E-10_detailed.md`
 - `05_auth/API_SPEC_DRAFT.md`
+- `05_auth/TEST_CASES.md`
 
 회원가입, 로그인, JWT, user_id 위조 방지, 만료와 권한, 첫 로그인 자동 출석 연결을 다룬다.
 
@@ -146,6 +174,7 @@
 
 - `06_housing/F-01_to_F-10_detailed.md`
 - `06_housing/API_SPEC_DRAFT.md`
+- `06_housing/TEST_CASES.md`
 
 하우스 조회, 소유권, 배치 수량, 이동/회전/삭제, 벽지/바닥, 다른 집 방문, 고양이 배치 스키마 갭을 다룬다.
 
@@ -153,6 +182,7 @@
 
 - `07_shop/G-01_to_G-10_detailed.md`
 - `07_shop/API_SPEC_DRAFT.md`
+- `07_shop/TEST_CASES.md`
 
 상품 조회, 구매, Atomic Update, 잔액 부족, 연타, Inventory upsert, rollback과 JWT 전환을 다룬다.
 
@@ -160,6 +190,7 @@
 
 - `08_attendance/H-01_to_H-10_detailed.md`
 - `08_attendance/API_SPEC_DRAFT.md`
+- `08_attendance/TEST_CASES.md`
 
 **자정 이후 첫 로그인 자동 출석 + 100원**, streak, 중복 요청, transaction rollback, timezone을 다룬다.
 
