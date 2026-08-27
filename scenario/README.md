@@ -95,6 +95,10 @@
 - `02_gacha/API_SPEC_DRAFT.md` : 고양이 조회, 가챠 실행 후보, 재화 차감, 중복/천장/rollback
 - `03_battle/API_SPEC_DRAFT.md` : 방/Ready/ROOM_TASKS, scoring, WebSocket, 결과/보상
 - `04_rank_challenge/API_SPEC_DRAFT.md` : 랭킹 조회, 승급전 시작/저장, 채점, TIMEOUT/SUCCESS/FAILED
+- `05_auth/API_SPEC_DRAFT.md` : 회원가입/로그인 후보, JWT 사용자 식별, 401/403, 자동 출석 연결
+- `06_housing/API_SPEC_DRAFT.md` : 하우스 조회, 가구 CRUD, position_data, ownership, 고양이 배치 스키마 갭
+- `07_shop/API_SPEC_DRAFT.md` : 아이템/Inventory 조회, Atomic 구매, upsert, rollback, JWT 전환
+- `08_attendance/API_SPEC_DRAFT.md` : 현재 check-in 구현과 첫 로그인 자동 출석, 100원, UNIQUE, timezone
 
 이 명세는 **현재 구현 / 추가 필요 / 정책 미정**을 분리해서 적는다. 문서에 endpoint 후보가 있다고 해서 코드에 구현됐다는 뜻은 아니다.
 
@@ -134,24 +138,28 @@
 ## E. 인증
 
 - `05_auth/E-01_to_E-10_detailed.md`
+- `05_auth/API_SPEC_DRAFT.md`
 
-회원가입, 로그인, JWT, user_id 위조 방지, 만료와 권한을 다룬다.
+회원가입, 로그인, JWT, user_id 위조 방지, 만료와 권한, 첫 로그인 자동 출석 연결을 다룬다.
 
 ## F. 하우징
 
 - `06_housing/F-01_to_F-10_detailed.md`
+- `06_housing/API_SPEC_DRAFT.md`
 
-하우스 조회, 소유권, 배치 수량, 이동/회전/삭제, 벽지/바닥, 다른 집 방문을 다룬다.
+하우스 조회, 소유권, 배치 수량, 이동/회전/삭제, 벽지/바닥, 다른 집 방문, 고양이 배치 스키마 갭을 다룬다.
 
 ## G. 상점
 
 - `07_shop/G-01_to_G-10_detailed.md`
+- `07_shop/API_SPEC_DRAFT.md`
 
-상품 조회, 구매, Atomic Update, 잔액 부족, 연타, Inventory upsert, rollback을 다룬다.
+상품 조회, 구매, Atomic Update, 잔액 부족, 연타, Inventory upsert, rollback과 JWT 전환을 다룬다.
 
 ## H. 출석
 
 - `08_attendance/H-01_to_H-10_detailed.md`
+- `08_attendance/API_SPEC_DRAFT.md`
 
 **자정 이후 첫 로그인 자동 출석 + 100원**, streak, 중복 요청, transaction rollback, timezone을 다룬다.
 
