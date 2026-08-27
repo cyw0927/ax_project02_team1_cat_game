@@ -24,6 +24,10 @@ class JoinRoomRequest(BaseModel):
     team_name: str | None = None
 
 
+class SetReadyRequest(BaseModel):
+    is_ready: bool
+
+
 @router.get("/rooms")
 def get_rooms(db: Session = Depends(get_db)):
     rooms = db.scalars(select(Room).order_by(Room.title)).all()
@@ -146,6 +150,38 @@ def join_room(
         "user_id": participant.user_id,
         "team_name": participant.team_name,
         "current_score": participant.current_score,
+        "is_ready": participant.is_ready,
+    }
+
+
+@router.patch("/rooms/{room_id}/participants/{user_id}/ready")
+def set_participant_ready(
+    room_id: uuid.UUID,
+    user_id: uuid.UUID,
+    payload: SetReadyRequest,
+    db: Session = Depends(get_db),
+):
+    participant = db.scalar(
+        select(RoomParticipant).where(
+            RoomParticipant.room_id == room_id,
+            RoomParticipant.user_id == user_id,
+        )
+    )
+
+    if participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room participant not found",
+        )
+
+    participant.is_ready = payload.is_ready
+    db.commit()
+    db.refresh(participant)
+
+    return {
+        "participant_id": participant.id,
+        "room_id": participant.room_id,
+        "user_id": participant.user_id,
         "is_ready": participant.is_ready,
     }
 
