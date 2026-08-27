@@ -161,6 +161,19 @@ def set_participant_ready(
     payload: SetReadyRequest,
     db: Session = Depends(get_db),
 ):
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+
+    if room.status != "WAITING":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ready state can only change while room is waiting",
+        )
+
     participant = db.scalar(
         select(RoomParticipant).where(
             RoomParticipant.room_id == room_id,
