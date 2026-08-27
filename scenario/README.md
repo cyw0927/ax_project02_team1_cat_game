@@ -87,30 +87,47 @@
 
 ---
 
+# 도메인별 API 명세 초안
+
+시나리오를 실제 개발 계약으로 옮길 때는 각 도메인의 `API_SPEC_DRAFT.md`를 본다.
+
+- `01_learning_grading/API_SPEC_DRAFT.md` : 학습 조회, 제출 202/PENDING, polling, BackgroundTask, Sandbox, 보상
+- `02_gacha/API_SPEC_DRAFT.md` : 고양이 조회, 가챠 실행 후보, 재화 차감, 중복/천장/rollback
+- `03_battle/API_SPEC_DRAFT.md` : 방/Ready/ROOM_TASKS, scoring, WebSocket, 결과/보상
+- `04_rank_challenge/API_SPEC_DRAFT.md` : 랭킹 조회, 승급전 시작/저장, 채점, TIMEOUT/SUCCESS/FAILED
+
+이 명세는 **현재 구현 / 추가 필요 / 정책 미정**을 분리해서 적는다. 문서에 endpoint 후보가 있다고 해서 코드에 구현됐다는 뜻은 아니다.
+
+---
+
 # 상세 시나리오
 
 ## A. 학습·채점
 
 - `01_learning_grading/A-01_task_detail_view.md`
 - `01_learning_grading/A-02_to_A-10_detailed.md`
+- `01_learning_grading/API_SPEC_DRAFT.md`
 
 문제 상세, 코드 제출, PENDING, Docker 채점, 정답/오답/오류/시간초과, 재제출, 중복 보상을 다룬다.
 
 ## B. 가챠
 
 - `02_gacha/B-01_to_B-10_detailed.md`
+- `02_gacha/API_SPEC_DRAFT.md`
 
 가챠 화면, 단일/다회, 잔액 부족, 연타, 희귀도, 중복, rollback, 천장을 다룬다.
 
 ## C. 실시간 배틀
 
 - `03_battle/C-01_to_C-10_detailed.md`
+- `03_battle/API_SPEC_DRAFT.md`
 
-방 목록/생성/입장, `FOR UPDATE`, Ready, 시작, 점수, 종료를 다룬다.
+방 목록/생성/입장, `FOR UPDATE`, Ready, 시작, 점수, WebSocket, 종료/보상을 다룬다.
 
 ## D. 승급전
 
 - `04_rank_challenge/D-01_to_D-10_detailed.md`
+- `04_rank_challenge/API_SPEC_DRAFT.md`
 
 승급전 시작, 중복 시작, 문제 순서, 자동 저장, 이어하기, 제출, TIMEOUT, 성공/실패를 다룬다.
 
