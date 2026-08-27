@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.battle.models import Room, RoomParticipant, RoomTask
@@ -17,6 +17,11 @@ class CreateRoomRequest(BaseModel):
     title: str
     host_user_id: uuid.UUID
     max_participants: int = Field(ge=1)
+
+
+class JoinRoomRequest(BaseModel):
+    user_id: uuid.UUID
+    team_name: str | None = None
 
 
 @router.get("/rooms")
@@ -66,6 +71,82 @@ def create_room(payload: CreateRoomRequest, db: Session = Depends(get_db)):
         "host_user_id": room.host_user_id,
         "status": room.status,
         "max_participants": room.max_participants,
+    }
+
+
+@router.post(
+    "/rooms/{room_id}/participants",
+    status_code=status.HTTP_201_CREATED,
+)
+def join_room(
+    room_id: uuid.UUID,
+    payload: JoinRoomRequest,
+    db: Session = Depends(get_db),
+):
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+
+    if db.get(User, payload.user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if room.status != "WAITING":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room is not accepting participants",
+        )
+
+    existing = db.scalar(
+        select(RoomParticipant.id).where(
+            RoomParticipant.room_id == room_id,
+            RoomParticipant.user_id == payload.user_id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already joined this room",
+        )
+
+    participant_count = db.scalar(
+        select(func.count(RoomParticipant.id)).where(
+            RoomParticipant.room_id == room_id
+        )
+    )
+    if participant_count >= room.max_participants:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room is full",
+        )
+
+    team_name = payload.team_name.strip() if payload.team_name else None
+    if team_name == "":
+        team_name = None
+
+    participant = RoomParticipant(
+        room_id=room_id,
+        user_id=payload.user_id,
+        team_name=team_name,
+        current_score=0,
+        is_ready=False,
+    )
+    db.add(participant)
+    db.commit()
+    db.refresh(participant)
+
+    return {
+        "participant_id": participant.id,
+        "room_id": participant.room_id,
+        "user_id": participant.user_id,
+        "team_name": participant.team_name,
+        "current_score": participant.current_score,
+        "is_ready": participant.is_ready,
     }
 
 
