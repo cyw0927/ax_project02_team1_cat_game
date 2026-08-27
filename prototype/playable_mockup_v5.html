@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat Game Playable Mockup v5 - FastAPI Housing Bridge</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#2d241d}#game{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body>
+<iframe id="game" src="playable_mockup_v4.html" title="Cat Game Playable Prototype v5"></iframe>
+<script>
+(()=>{
+ const API='http://127.0.0.1:8000';
+ const frame=document.getElementById('game');
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ async function until(fn,limit=12000){const t=performance.now();while(performance.now()-t<limit){const v=fn();if(v)return v;await wait(60)}throw new Error('v5 init timeout')}
+ frame.addEventListener('load',async()=>{
+  try{
+   const d4=frame.contentDocument;
+   const f3=await until(()=>d4&&d4.getElementById('game'));
+   const d3=f3.contentDocument;
+   const f2=await until(()=>d3&&d3.getElementById('game'));
+   const d=f2.contentDocument;
+   const house=await until(()=>d&&d.getElementById('house'));
+   const houseFrame=house.querySelector('iframe');
+   if(!houseFrame)return;
+
+   const css=d.createElement('style');
+   css.textContent=`
+    .apiHousePanel{position:absolute;right:1.5%;top:2%;z-index:10020;width:28%;max-height:72%;overflow:auto;padding:12px;border:3px solid #704323;border-radius:20px;background:#fff3dff2;box-shadow:0 8px 24px #0004;font-size:clamp(10px,.85vw,13px)}
+    .apiHousePanel input,.apiHousePanel select{width:100%;padding:6px;border:1px solid #a77a55;border-radius:9px;margin:4px 0}.apiHouseRow{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.apiHouseRow button{padding:6px 8px}.apiPlaced{display:flex;justify-content:space-between;gap:6px;align-items:center;padding:6px;border-bottom:1px dashed #c69a70}.houseMarker{position:absolute;z-index:10005;transform:translate(-50%,-50%);padding:5px 7px;border-radius:12px;border:2px solid #7b4b28;background:#fff7e6e8;font-weight:900;box-shadow:0 4px 10px #0003;pointer-events:none;white-space:nowrap}.houseMarker small{display:block;font-weight:700;opacity:.7}.apiHouseStatus{font-weight:900;margin:6px 0}.apiHouseHint{opacity:.72;font-size:.9em}
+   `;
+   d.head.append(css);
+
+   const panel=d.createElement('div');panel.className='apiHousePanel';
+   panel.innerHTML=`
+    <b>🏠 실제 FastAPI 하우징</b>
+    <input id="houseUser" placeholder="DB user UUID">
+    <div class="apiHouseRow"><button id="houseLoad" class="tiny">하우스 불러오기</button><button id="houseInv" class="tiny">인벤토리 불러오기</button></div>
+    <div id="houseApiState" class="apiHouseStatus">대기 중</div>
+    <hr>
+    <label>배치할 아이템<select id="houseItem"><option value="">인벤토리를 먼저 불러오세요</option></select></label>
+    <div class="apiHouseRow"><label style="flex:1">X<input id="houseX" type="number" min="12" max="84" value="46"></label><label style="flex:1">Y<input id="houseY" type="number" min="38" max="90" value="70"></label></div>
+    <div class="apiHouseRow"><button id="housePlace" class="tiny">실제 배치</button><button id="houseCenter" class="tiny">중앙 좌표</button></div>
+    <div id="surfaceButtons"></div>
+    <h4>DB 배치 오브젝트</h4><div id="placedList" class="apiHouseHint">아직 조회하지 않았습니다.</div>
+    <p class="apiHouseHint">마커는 DB의 position_data를 시각화한 프로토타입입니다. 실제 가구 이미지/충돌 크기는 아직 확정하지 않습니다.</p>`;
+   house.append(panel);
+
+   const user=panel.querySelector('#houseUser'),state=panel.querySelector('#houseApiState'),itemSel=panel.querySelector('#houseItem'),xIn=panel.querySelector('#houseX'),yIn=panel.querySelector('#houseY'),placedList=panel.querySelector('#placedList'),surfaceBox=panel.querySelector('#surfaceButtons');
+   user.value=localStorage.getItem('catGameApiUserId')||'';
+   user.addEventListener('change',()=>localStorage.setItem('catGameApiUserId',user.value.trim()));
+   let inventory=[],houseData=null;
+   const uid=()=>user.value.trim();
+   const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+   const posOf=p=>({x:Number(p&&p.x??50),y:Number(p&&p.y??70),rotation:Number(p&&p.rotation??0)});
+
+   function clearMarkers(){house.querySelectorAll('.houseMarker').forEach(x=>x.remove())}
+   function renderMarkers(){
+    clearMarkers();if(!houseData)return;
+    for(const o of houseData.placed_objects||[]){const p=posOf(o.position_data);const m=d.createElement('div');m.className='houseMarker';m.style.left=p.x+'%';m.style.top=p.y+'%';m.style.rotate=p.rotation+'deg';m.innerHTML=`📦 ${safe(o.name)}<small>${p.x}, ${p.y}</small>`;house.append(m)}
+   }
+   function renderPlaced(){
+    const rows=houseData&&houseData.placed_objects||[];
+    placedList.innerHTML=rows.length?rows.map(o=>{const p=posOf(o.position_data);return `<div class="apiPlaced"><span>${safe(o.name)}<br><small>${p.x},${p.y}</small></span><span><button class="tiny" data-move="${o.placed_object_id}">+5 X</button> <button class="tiny" data-del="${o.placed_object_id}">삭제</button></span></div>`}).join(''):'배치된 오브젝트가 없습니다.';
+    renderMarkers();
+   }
+   async function loadHouse(){
+    const id=uid();if(!id){state.textContent='사용자 UUID를 입력하세요.';return}
+    state.textContent='하우스 조회 중…';
+    try{const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/house');const data=await r.json().catch(()=>({}));if(!r.ok){state.textContent=`조회 실패 ${r.status}: ${data.detail||''}`;return}houseData=data;state.textContent=`🟢 실제 house Lv.${data.house_level} · 배치 ${data.placed_objects.length}개`;renderPlaced();renderSurfaces()}catch(e){state.textContent='하우스 연결 실패: '+e.message}
+   }
+   async function loadInventory(){
+    const id=uid();if(!id){state.textContent='사용자 UUID를 입력하세요.';return}
+    try{const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/inventory');const data=await r.json().catch(()=>[]);if(!r.ok){state.textContent=`인벤토리 실패 ${r.status}: ${data.detail||''}`;return}inventory=data;itemSel.innerHTML=data.filter(x=>!['wallpaper','floor'].includes(x.category)).map(x=>`<option value="${x.item_id}">${safe(x.name)} × ${x.quantity}</option>`).join('')||'<option value="">배치 가능한 아이템 없음</option>';state.textContent=`🟢 인벤토리 ${data.length}종 조회`;renderSurfaces()}catch(e){state.textContent='인벤토리 연결 실패: '+e.message}
+   }
+   function renderSurfaces(){
+    const surfaces=inventory.filter(x=>['wallpaper','floor'].includes(x.category));
+    surfaceBox.innerHTML=surfaces.length?'<h4>벽지 / 바닥</h4>'+surfaces.map(x=>`<button class="tiny" data-surface="${x.category}" data-item="${x.item_id}">${x.category==='wallpaper'?'🖼️':'🪵'} ${safe(x.name)}</button>`).join(' '):'';
+   }
+   async function place(){
+    const id=uid(),item=Number(itemSel.value);if(!id||!item){state.textContent='사용자와 아이템을 선택하세요.';return}
+    const payload={item_id:item,position_data:{x:Number(xIn.value),y:Number(yIn.value),rotation:0}};state.textContent='실제 DB에 배치 중…';
+    try{const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/house/objects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json().catch(()=>({}));if(!r.ok){state.textContent=`배치 실패 ${r.status}: ${data.detail||''}`;return}state.textContent='✅ 실제 배치 완료';await loadHouse()}catch(e){state.textContent='배치 연결 실패: '+e.message}
+   }
+   async function moveObject(objectId){
+    const id=uid(),obj=houseData&&houseData.placed_objects.find(x=>x.placed_object_id===objectId);if(!id||!obj)return;const p=posOf(obj.position_data);p.x=Math.min(84,p.x+5);
+    const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/house/objects/'+encodeURIComponent(objectId),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({position_data:p})});const data=await r.json().catch(()=>({}));state.textContent=r.ok?'✅ 실제 위치 이동':`이동 실패 ${r.status}: ${data.detail||''}`;if(r.ok)await loadHouse();
+   }
+   async function removeObject(objectId){
+    const id=uid();if(!id)return;const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/house/objects/'+encodeURIComponent(objectId),{method:'DELETE'});const data=await r.json().catch(()=>({}));state.textContent=r.ok?'✅ 실제 배치 삭제':`삭제 실패 ${r.status}: ${data.detail||''}`;if(r.ok)await loadHouse();
+   }
+   async function setSurface(category,itemId){
+    const id=uid();if(!id)return;const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/house/'+category,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:Number(itemId)})});const data=await r.json().catch(()=>({}));state.textContent=r.ok?`✅ 실제 ${category} 적용`:`적용 실패 ${r.status}: ${data.detail||''}`;if(r.ok)await loadHouse();
+   }
+   panel.querySelector('#houseLoad').addEventListener('click',e=>{e.preventDefault();loadHouse()});
+   panel.querySelector('#houseInv').addEventListener('click',e=>{e.preventDefault();loadInventory()});
+   panel.querySelector('#housePlace').addEventListener('click',e=>{e.preventDefault();place()});
+   panel.querySelector('#houseCenter').addEventListener('click',e=>{e.preventDefault();xIn.value=50;yIn.value=72});
+   placedList.addEventListener('click',e=>{const m=e.target.closest('[data-move]'),del=e.target.closest('[data-del]');if(m)moveObject(m.dataset.move);if(del)removeObject(del.dataset.del)});
+   surfaceBox.addEventListener('click',e=>{const b=e.target.closest('[data-surface]');if(b)setSurface(b.dataset.surface,b.dataset.item)});
+   if(uid()){loadInventory();loadHouse()}
+  }catch(err){console.error(err)}
+ });
+})();
+</script>
+</body>
+</html>
