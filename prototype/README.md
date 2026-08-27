@@ -1,6 +1,6 @@
 # 플레이어블 프로토타입
 
-현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v4.html`입니다.
+현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v5.html`입니다.
 
 ## 실행 방법
 
@@ -52,7 +52,20 @@ http://127.0.0.1:5500/
 
 상점의 실제 DB 재화와 홈 화면의 DEMO 사료 숫자는 서로 섞지 않습니다.
 
-프로토타입은 `5500`, FastAPI는 `8000`에서 실행되므로 개발용 CORS 허용 목록에 `localhost:5500`과 `127.0.0.1:5500`이 등록되어 있습니다.
+### 하우징
+
+- `GET /users/{user_id}/house` 실제 하우스 상태 조회
+- `GET /users/{user_id}/inventory`에서 실제 보유 가구 선택
+- `POST /users/{user_id}/house/objects` 실제 가구 배치
+- `PATCH /users/{user_id}/house/objects/{placed_object_id}` 실제 위치 이동
+- `DELETE /users/{user_id}/house/objects/{placed_object_id}` 실제 배치 제거
+- `PUT /users/{user_id}/house/wallpaper` 실제 벽지 적용
+- `PUT /users/{user_id}/house/floor` 실제 바닥 적용
+- DB의 `position_data.x/y/rotation`을 하우스 화면 위 마커로 시각화
+
+현재 마커는 실제 가구 이미지가 아니라 DB 배치 좌표 연결 검증용입니다. 가구별 이미지 크기, 충돌 footprint, 회전 규칙은 아직 확정하지 않습니다.
+
+프로토타입은 `5500`, FastAPI는 `8000`에서 실행되므로 개발용 CORS 허용 목록에 `localhost:5500`과 `127.0.0.1:5500`이 등록되어 있어야 합니다.
 
 ## 아직 DEMO인 기능
 
@@ -63,7 +76,7 @@ http://127.0.0.1:5500/
 
 이 값들은 플레이 흐름 검증용이며 실제 서비스 경제 규칙이 아닙니다.
 
-## 하우스 프로토타입
+## 하우스 캐릭터 프로토타입
 
 - A* 이동 경로 탐색
 - 가구 충돌 회피
@@ -80,27 +93,28 @@ http://127.0.0.1:5500/
 2. 홈에서 `Study`로 이동합니다.
 3. `FastAPI 연결됨` 표시와 실제 `/tasks` 개수를 확인합니다.
 4. DBeaver 등에서 실제 USERS 테이블의 UUID 하나를 입력합니다.
-5. 코드를 제출합니다.
-6. 화면에 실제 `attempt_id`와 `status=PENDING`이 표시되는지 확인합니다.
-7. DB의 `TASK_ATTEMPTS`에 같은 attempt가 생성됐는지 확인합니다.
-8. 홈에서 `Shop`으로 이동합니다.
-9. 같은 실제 사용자 UUID로 아이템 목록을 불러오고 구매합니다.
-10. 화면의 실제 DB 잔액과 인벤토리 수량이 바뀌는지 확인합니다.
-11. DBeaver에서 USERS.balance와 INVENTORIES가 같은 결과인지 확인합니다.
-12. Home/Daily/Gacha/House DEMO 흐름도 기존처럼 동작하는지 회귀 확인합니다.
-13. House에서 이동과 가구 상호작용을 확인합니다.
+5. 코드를 제출하고 실제 `attempt_id`, `status=PENDING`을 확인합니다.
+6. 홈에서 `Shop`으로 이동해 같은 UUID로 실제 구매와 인벤토리 변경을 확인합니다.
+7. `House`로 이동해 같은 UUID로 하우스와 인벤토리를 불러옵니다.
+8. 보유 가구를 좌표에 실제 배치합니다.
+9. 하우스 화면에 DB 위치 마커가 나타나는지 확인합니다.
+10. `+5 X` 이동 후 마커와 DB `position_data`가 함께 바뀌는지 확인합니다.
+11. 삭제 후 `PLACED_OBJECTS`와 화면 마커가 함께 사라지는지 확인합니다.
+12. wallpaper/floor 보유 아이템이 있다면 실제 적용 후 USERS의 surface FK가 바뀌는지 확인합니다.
+13. Home/Daily/Gacha DEMO와 하우스 캐릭터 이동/상호작용도 회귀 확인합니다.
 
 ## 파일 관계
 
 ```text
 index.html
-└─ playable_mockup_v4.html          # FastAPI 상점 연결
-   └─ playable_mockup_v3.html       # FastAPI 학습 연결
-      └─ playable_mockup_v2.html    # 공유 DEMO 게임 상태
-         └─ house_motion_mockup_v4.html
-            └─ house_motion_mockup_v3.html
-               └─ house_motion_mockup_v2.html
-                  └─ house_motion_mockup.html
+└─ playable_mockup_v5.html          # FastAPI 하우징 연결
+   └─ playable_mockup_v4.html       # FastAPI 상점 연결
+      └─ playable_mockup_v3.html    # FastAPI 학습 연결
+         └─ playable_mockup_v2.html # 공유 DEMO 게임 상태
+            └─ house_motion_mockup_v4.html
+               └─ house_motion_mockup_v3.html
+                  └─ house_motion_mockup_v2.html
+                     └─ house_motion_mockup.html
 ```
 
 이전 버전은 회귀 확인용으로 유지합니다. 평소에는 `index.html`만 실행하면 됩니다.
@@ -109,5 +123,5 @@ index.html
 
 1. 학습 `PENDING` → Docker 채점 결과 연결
 2. 실제 사용자 식별 방식/JWT 연결
-3. 하우징 API 연결
+3. 실제 고양이 소유 목록을 하우스 roster에 연결
 4. 가챠 정책 확정 후 가챠 API 연결
