@@ -1,6 +1,6 @@
 # 플레이어블 프로토타입
 
-현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v13.html`입니다.
+현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v14.html`입니다.
 
 ## 실행
 
@@ -29,16 +29,18 @@ python -m http.server 5500
 
 학습 채점 worker는 아직 연결 전이라 attempt가 `PENDING`에 머무를 수 있습니다. 데일리 퀘스트와 가챠는 아직 DEMO입니다.
 
-## 스타터 주황 고양이 v13
+## 시작 즉시 주황 고양이 v14
 
-게임 시작 시 고양이가 한 마리도 없어 플레이가 막히지 않도록 주황 고양이를 기본 스타터로 보장합니다.
+게임을 처음 열었을 때 UUID나 DB 설정이 없어도 하우스에서 바로 주황 고양이 한 마리를 보고 플레이할 수 있습니다.
 
-- 기본 스타터는 `cat_id=1` 주황 고양이입니다.
-- `POST /users/{user_id}/cats/starter`가 스타터 보유 여부를 확인합니다.
+- UUID가 없으면 기존 단일 주황 고양이 `catV2`를 즉시 표시합니다.
+- 이 로컬 스타터는 기존 이동/자동 산책/IDLE/가구 상호작용 로직을 그대로 사용합니다.
+- UUID를 입력하면 로컬 스타터를 숨기고 DB 고양이 모드로 전환합니다.
+- DB 모드에서는 먼저 `POST /users/{user_id}/cats/starter`를 호출해 `cat_id=1` 주황 고양이를 최소 1마리 보장합니다.
 - 이미 `cat_id=1`을 보유한 사용자는 중복 지급하지 않습니다.
-- 스타터 Cat 마스터가 아직 DB에 없으면 기본 이름/페르소나/rarity로 생성한 뒤 지급합니다.
-- 현재 회원가입 API가 아직 없으므로 `playable_mockup_v13.html`이 USER_CATS 조회 전에 이 API를 자동 호출합니다.
-- 추후 Auth/회원가입 구현 시 같은 starter provisioning 로직을 신규 사용자 생성 트랜잭션에서 호출하도록 이동할 수 있습니다.
+- 스타터 Cat 마스터가 DB에 없으면 기본 이름/페르소나/rarity로 생성한 뒤 지급합니다.
+- 이후 실제 `GET /users/{user_id}/cats` 결과를 사용해 보유 고양이 수만큼 하우스 캐릭터를 생성합니다.
+- 추후 Auth/회원가입 구현 시 같은 starter provisioning 로직을 신규 사용자 생성 트랜잭션으로 옮길 수 있습니다.
 
 ## 고양이 실제 스프라이트 자산
 
@@ -51,7 +53,7 @@ python -m http.server 5500
 
 ## DB 멀티고양이 하우스
 
-`playable_mockup_v12.html`의 USER_CATS 기반 동적 생성 로직을 v13이 그대로 사용합니다.
+`playable_mockup_v12.html`의 USER_CATS 기반 동적 생성 로직을 v13/v14가 이어서 사용합니다.
 
 - 실제 `GET /users/{user_id}/cats` 결과 사용
 - 보유 고양이 수만큼 캐릭터 동적 생성
@@ -64,20 +66,21 @@ python -m http.server 5500
 
 ```text
 index.html
-└─ playable_mockup_v13.html            # 스타터 주황 고양이 자동 보장
-   └─ playable_mockup_v12.html          # USER_CATS 기반 동적 멀티고양이
-      └─ playable_mockup_v9.html        # 실제 검정/흰 WebP asset
-         └─ playable_mockup_v8.html
-            └─ playable_mockup_v7.html  # cat_id → sprite asset 매핑
-               └─ playable_mockup_v6.html
-                  └─ playable_mockup_v5.html
-                     └─ playable_mockup_v4.html
-                        └─ playable_mockup_v3.html
-                           └─ playable_mockup_v2.html
-                              └─ house_motion_mockup_v4.html
-                                 └─ house_motion_mockup_v3.html
-                                    └─ house_motion_mockup_v2.html
-                                       └─ house_motion_mockup.html
+└─ playable_mockup_v14.html            # UUID 없어도 주황 스타터 즉시 플레이
+   └─ playable_mockup_v13.html          # DB 스타터 주황 고양이 자동 보장
+      └─ playable_mockup_v12.html       # USER_CATS 기반 동적 멀티고양이
+         └─ playable_mockup_v9.html     # 실제 검정/흰 WebP asset
+            └─ playable_mockup_v8.html
+               └─ playable_mockup_v7.html  # cat_id → sprite asset 매핑
+                  └─ playable_mockup_v6.html
+                     └─ playable_mockup_v5.html
+                        └─ playable_mockup_v4.html
+                           └─ playable_mockup_v3.html
+                              └─ playable_mockup_v2.html
+                                 └─ house_motion_mockup_v4.html
+                                    └─ house_motion_mockup_v3.html
+                                       └─ house_motion_mockup_v2.html
+                                          └─ house_motion_mockup.html
 ```
 
 ## 다음 구현 후보
@@ -87,3 +90,5 @@ index.html
 3. JWT 사용자 식별과 실제 회원가입 시 starter 지급 연결
 4. 실제 하우스 최대 배치 마릿수/선택 규칙 확정
 5. 가챠 정책 확정 후 실제 가챠 API 연결
+
+행동 스프라이트 생성 시도에서 UI 콜라주 형태 이미지가 생성된 경우에는 게임 자산으로 채택하지 않습니다. 전용 행동 스프라이트는 캐릭터 일관성이 확보된 투명 시트가 준비됐을 때 연결합니다.
