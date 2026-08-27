@@ -1,6 +1,6 @@
 # 플레이어블 프로토타입
 
-현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v5.html`입니다.
+현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v6.html`입니다.
 
 ## 실행 방법
 
@@ -65,6 +65,16 @@ http://127.0.0.1:5500/
 
 현재 마커는 실제 가구 이미지가 아니라 DB 배치 좌표 연결 검증용입니다. 가구별 이미지 크기, 충돌 footprint, 회전 규칙은 아직 확정하지 않습니다.
 
+### 보유 고양이
+
+- `GET /users/{user_id}/cats` 실제 USER_CATS + CATS 조인 결과 조회
+- 실제 보유 고양이로 하우스 roster 교체
+- `name`, `rarity`, `persona` 표시
+- roster에서 한 마리를 선택하면 현재 움직이는 주황 스프라이트가 어떤 DB 고양이를 대표 중인지 배지로 표시
+- 선택한 `user_cat_id`는 localStorage에 저장해 새로고침 후에도 유지
+
+현재는 고양이별 외형 스프라이트가 준비되지 않았으므로 모든 보유 고양이가 같은 주황 캐릭터 외형을 공유합니다. DB 고양이마다 외형을 임의 생성하거나 이름만 보고 색을 바꾸지 않습니다.
+
 프로토타입은 `5500`, FastAPI는 `8000`에서 실행되므로 개발용 CORS 허용 목록에 `localhost:5500`과 `127.0.0.1:5500`이 등록되어 있어야 합니다.
 
 ## 아직 DEMO인 기능
@@ -72,7 +82,7 @@ http://127.0.0.1:5500/
 - 학습 정답 보상/재화 증가
 - 데일리 퀘스트
 - 가챠 소비와 결과
-- 가챠로 획득한 고양이 목록 공유
+- 가챠로 새 USER_CATS를 생성하는 실제 획득 처리
 
 이 값들은 플레이 흐름 검증용이며 실제 서비스 경제 규칙이 아닙니다.
 
@@ -86,6 +96,7 @@ http://127.0.0.1:5500/
 - 침대 → 자기
 - 공부 지점 → 공부 행동
 - 고양이 클릭 → 말풍선 반응
+- 실제 DB에서 선택한 고양이 이름/등급을 현재 움직이는 캐릭터와 연결
 
 ## 권장 검증 순서
 
@@ -101,20 +112,24 @@ http://127.0.0.1:5500/
 10. `+5 X` 이동 후 마커와 DB `position_data`가 함께 바뀌는지 확인합니다.
 11. 삭제 후 `PLACED_OBJECTS`와 화면 마커가 함께 사라지는지 확인합니다.
 12. wallpaper/floor 보유 아이템이 있다면 실제 적용 후 USERS의 surface FK가 바뀌는지 확인합니다.
-13. Home/Daily/Gacha DEMO와 하우스 캐릭터 이동/상호작용도 회귀 확인합니다.
+13. 같은 UUID로 `보유 고양이 불러오기`를 누릅니다.
+14. DB의 USER_CATS 수와 roster 수가 같은지 확인합니다.
+15. roster에서 고양이를 바꾸면 상단 선택 배지의 이름/rarity가 바뀌는지 확인합니다.
+16. Home/Daily/Gacha DEMO와 하우스 캐릭터 이동/상호작용도 회귀 확인합니다.
 
 ## 파일 관계
 
 ```text
 index.html
-└─ playable_mockup_v5.html          # FastAPI 하우징 연결
-   └─ playable_mockup_v4.html       # FastAPI 상점 연결
-      └─ playable_mockup_v3.html    # FastAPI 학습 연결
-         └─ playable_mockup_v2.html # 공유 DEMO 게임 상태
-            └─ house_motion_mockup_v4.html
-               └─ house_motion_mockup_v3.html
-                  └─ house_motion_mockup_v2.html
-                     └─ house_motion_mockup.html
+└─ playable_mockup_v6.html          # FastAPI 보유 고양이 연결
+   └─ playable_mockup_v5.html       # FastAPI 하우징 연결
+      └─ playable_mockup_v4.html    # FastAPI 상점 연결
+         └─ playable_mockup_v3.html # FastAPI 학습 연결
+            └─ playable_mockup_v2.html # 공유 DEMO 게임 상태
+               └─ house_motion_mockup_v4.html
+                  └─ house_motion_mockup_v3.html
+                     └─ house_motion_mockup_v2.html
+                        └─ house_motion_mockup.html
 ```
 
 이전 버전은 회귀 확인용으로 유지합니다. 평소에는 `index.html`만 실행하면 됩니다.
@@ -123,5 +138,6 @@ index.html
 
 1. 학습 `PENDING` → Docker 채점 결과 연결
 2. 실제 사용자 식별 방식/JWT 연결
-3. 실제 고양이 소유 목록을 하우스 roster에 연결
-4. 가챠 정책 확정 후 가챠 API 연결
+3. 고양이별 실제 스프라이트/외형 자산 매핑
+4. 여러 보유 고양이의 동시 하우스 배치 규칙 확정 후 구현
+5. 가챠 정책 확정 후 가챠 API 연결
