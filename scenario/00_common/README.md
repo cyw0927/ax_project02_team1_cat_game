@@ -2,9 +2,9 @@
 
 이 폴더는 `01_learning_grading`부터 `08_attendance`까지 모든 기능이 공통으로 따라야 할 설계 원칙을 모아둔 공간이다.
 
-개별 기능 시나리오는 각 도메인 폴더에 두고, 여기에는 기능을 가로질러 같이 봐야 하는 규칙과 구현 기준을 둔다.
+**문서 설계는 `53_design_completion_implementation_handoff.md`를 마지막으로 완료 상태**로 본다.
 
-문서가 많아졌기 때문에 번호를 전부 한 줄씩 늘어놓기보다 **주제별 묶음**으로 찾는 것을 권장한다.
+새 요구사항이 생기지 않는 한 새 공통 문서를 계속 추가하지 않고, 구현 변화는 기존 문서를 갱신한다.
 
 ---
 
@@ -19,7 +19,7 @@
 - `07_test_strategy.md` : 테스트 전략
 - `08_team_work_and_git.md` : 3인 협업/Git
 - `09_db_constraint_and_migration_checklist.md` : DB constraint/Alembic
-- `10_cross_domain_data_flow.md` : 도메인 연결 흐름
+- `10_cross_domain_data_flow.md` : 최신 제품 흐름 기준 도메인 연결
 - `11_implementation_order.md` : 구현 순서
 - `12_definition_of_done.md` : 기능 완료 기준
 
@@ -27,7 +27,7 @@
 
 ## 13~17. 전체 제품 흐름·실행 계획
 
-- `13_latest_product_flow.md` : 최신 제품 흐름도 기준
+- `13_latest_product_flow.md` : 현재 제품 흐름의 상위 기준
 - `14_api_endpoint_inventory.md` : 전체 API 목록 초안
 - `15_db_before_after_examples.md` : DB Before/After
 - `16_test_case_matrix.md` : 핵심 테스트 매트릭스
@@ -49,7 +49,7 @@
 
 - `23_table_crud_matrix.md` : 19테이블 CRUD 책임
 - `24_api_dependency_graph.md` : API 의존관계
-- `25_unresolved_blocker_priority.md` : P0/P1/P2 개발 블로커
+- `25_unresolved_blocker_priority.md` : P0/P1/P2 실제 결정 블로커
 - `26_data_ownership_permission_matrix.md` : 데이터 ownership/권한
 - `27_transaction_boundary_map.md` : transaction/commit/rollback 경계
 
@@ -57,7 +57,7 @@
 
 ## 28~32. 시간·중복·로그·설정·개발 테스트
 
-- `28_time_timezone_policy.md` : UTC/KST/timezone
+- `28_time_timezone_policy.md` : UTC/SERVICE_TIMEZONE 기준과 미정값 구분
 - `29_idempotency_duplicate_request_policy.md` : 중복 요청/idempotency
 - `30_logging_audit_trace_policy.md` : 로그/감사/request_id
 - `31_config_environment_variable_policy.md` : `.env`/설정값
@@ -95,59 +95,91 @@
 
 ---
 
-## 48~52. 현재 코드 감사·스키마 갭·릴리즈 준비
+## 48~53. 현재 코드 감사·스키마 갭·릴리즈·구현 인수인계
 
 - `48_current_backend_implementation_status.md` : 실제 `main` 코드 구현 현황
 - `49_schema_gap_register.md` : 현재 19테이블과 최신 시나리오 사이 스키마 갭
 - `50_api_implementation_gap_matrix.md` : API별 DONE/PARTIAL/MISSING/POLICY
 - `51_migration_change_plan.md` : 설계 확정 후 migration 변경 순서
 - `52_mvp_backend_release_gate.md` : MVP 백엔드 최종 릴리즈 게이트
+- `53_design_completion_implementation_handoff.md` : **문서 설계 완료 선언, 남은 결정, 바로 코딩 가능한 범위, 3인 착수 순서**
 
 ---
 
-## 현재 확정돼 있는 중요한 기준
+# 현재 확정된 중요한 기준
 
 - 출석 보상: **100원**
 - 지급 시점: **매일 자정 이후 첫 로그인 시 자동 처리**
-- 출석 날짜는 클라이언트 시간이 아니라 서버가 판단
+- 같은 날 재로그인은 추가 보상 없이 정상 로그인
+- 출석 날짜는 클라이언트가 아니라 서버가 판단
+- 서비스 timezone의 실제 값은 아직 팀 결정사항
 - Docker: memory 128MB / CPU 0.5 / network none / read-only
-- 재화 감소 단순 수치 연산은 Atomic UPDATE 우선
-- 여러 상태를 함께 검사하는 변경은 필요한 구간에서 `SELECT ... FOR UPDATE`
-- 하루 한 번 같은 유일성은 DB UNIQUE를 최종 방어선으로 사용
-- 현재 미정인 가격/확률/점수/제한시간은 문서가 임의로 확정하지 않음
+- 코드 제출: PENDING 저장 후 `202 Accepted`, 긴 채점은 요청 밖에서 실행하는 방향
+- 재화 단순 차감: Atomic conditional UPDATE 우선
+- 여러 상태를 함께 검사: 필요한 구간 `SELECT ... FOR UPDATE`
+- 유일성 자체가 규칙: DB UNIQUE를 최종 방어선으로 사용
+- WebSocket: DB commit 후 전달, DB가 최종 상태 기준
+- 인증 최종 방향: JWT/current_user 기반 사용자 식별
+- 미정 가격/확률/점수/제한시간을 문서가 임의로 확정하지 않음
 
 ---
 
-## 사용하는 방법
+# 이제 어디부터 읽나
 
-새 기능을 개발할 때 전부 읽을 필요는 없다.
-
-예:
+## 구현 시작 직전
 
 ```text
-상점 구매
-→ 22 재화 write
-→ 27 transaction
-→ 29 중복요청
-→ 35 validation
-→ 50 현재 API 상태
+53_design_completion_implementation_handoff.md
+→ 25_unresolved_blocker_priority.md
+→ 48_current_backend_implementation_status.md
+→ 50_api_implementation_gap_matrix.md
 ```
+
+## 상점 구매 작업
 
 ```text
-배틀 scoring
-→ 20 상태전이
-→ 38/43 WebSocket
-→ 39 중복득점
-→ 40 보상 1회성
-→ 49 schema gap
+07_shop/README.md
+→ API_SPEC_DRAFT.md
+→ DB_BEFORE_AFTER.md
+→ TEST_CASES.md
+→ 공통 22 / 27 / 29 / 35
 ```
+
+## 배틀 scoring 작업
 
 ```text
-학습 Docker 연결
-→ 05 Docker
-→ 37 장애복구
-→ 44 BackgroundTask
-→ 48/50 현재 구현 갭
+03_battle/README.md
+→ API_SPEC_DRAFT.md
+→ DB_BEFORE_AFTER.md
+→ TEST_CASES.md
+→ 공통 39 / 40 / 43 / 49
 ```
 
-이 폴더는 문서를 많이 만드는 것 자체가 목적이 아니라, **코드를 만들기 전에 필요한 판단을 놓치지 않도록 하는 개발 지도**로 사용한다.
+## 학습 Docker 연결
+
+```text
+01_learning_grading/README.md
+→ API_SPEC_DRAFT.md
+→ TEST_CASES.md
+→ 공통 05 / 37 / 44 / 48 / 50
+```
+
+---
+
+# 문서 유지 원칙
+
+구현 후 상태가 바뀌면 새 문서를 만드는 대신:
+
+```text
+48 구현 현황
+50 API gap
+해당 도메인 README/API/DB/TEST
+```
+
+를 갱신한다.
+
+비즈니스 규칙이 새로 확정되면 `01_business_rule_decision_checklist.md`를 먼저 갱신한다.
+
+제품 흐름이 바뀌면 `13_latest_product_flow.md`와 `10_cross_domain_data_flow.md`를 함께 수정한다.
+
+**현재 요구사항 기준 문서 설계 단계는 완료되었다.**
