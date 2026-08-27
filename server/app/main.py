@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.battle.router import router as battle_router
 from app.cats.router import router as cats_router
 from app.economy.router import router as economy_router
 from app.housing.router import router as housing_router
@@ -12,6 +13,7 @@ app.include_router(economy_router)
 app.include_router(cats_router)
 app.include_router(housing_router)
 app.include_router(ranking_router)
+app.include_router(battle_router)
 
 
 @app.get("/")
