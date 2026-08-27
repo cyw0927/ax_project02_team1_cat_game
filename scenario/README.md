@@ -24,4 +24,42 @@
 - `07_shop/` : 상점 조회, 아이템 구매, 재화 차감, Inventory 반영과 동시성 방어 시나리오
 - `08_attendance/` : 출석 체크, 연속 출석, 하루 1회 보상과 UNIQUE 제약 시나리오
 
-> 현재는 설계·학습용 임시 문서입니다. 확정되지 않은 비즈니스 규칙은 임의로 확정하지 않고 `미정`으로 남깁니다.
+## 현재 작성된 상세 문서
+
+### A. 학습·채점
+- `01_learning_grading/A-01_task_detail_view.md` : 문제 하나를 정상적으로 여는 과정
+- `01_learning_grading/A-02_to_A-10_detailed.md` : 코드 제출, PENDING 대기, Docker 채점, 정답·오답·오류·시간초과, 재제출, 중복 보상 방어
+
+### B. 가챠
+- `02_gacha/B-01_to_B-10_detailed.md` : 가챠 화면, 1회/다회 뽑기, 잔액 부족, 연타, 희귀도, 중복, rollback, 천장
+
+### C. 실시간 배틀
+- `03_battle/C-01_to_C-10_detailed.md` : 방 목록/생성/입장, FOR UPDATE, Ready, 시작, 점수, 오답, 종료
+
+### D. 승급전
+- `04_rank_challenge/D-01_to_D-10_detailed.md` : 승급전 진입/시작, 중복 시작, 문제 조회, 자동 저장, 이어하기, 제출, TIMEOUT, 성공/실패
+
+### E. 인증
+- `05_auth/E-01_to_E-10_detailed.md` : 회원가입, username 중복, 로그인, JWT, 만료, user_id 위조 방지, 로그아웃, 권한
+
+### F. 하우징
+- `06_housing/F-01_to_F-10_detailed.md` : 하우스 조회, 가구 소유권, 배치 수량, 이동/회전/삭제, 벽지·바닥, 다른 집 방문
+
+### G. 상점
+- `07_shop/G-01_to_G-10_detailed.md` : 상품 조회, 구매 모달, Atomic Update, 잔액 부족, 연타, Inventory upsert, rollback
+
+### H. 출석
+- `08_attendance/H-01_to_H-10_detailed.md` : 첫 출석, 연속 출석, 중복 요청, UNIQUE, 보상 transaction, 자정/timezone
+
+## 작성 원칙
+
+- 확정된 요구사항과 아직 미정인 규칙을 섞지 않는다.
+- 가격, 확률, 점수, 제한시간처럼 기획에서 결정해야 하는 숫자는 임의로 확정하지 않는다.
+- 단순 조회 시나리오는 간단하게, 재화·Docker·Lock·Transaction·WebSocket처럼 위험한 부분은 더 자세히 적는다.
+- 프론트 버튼 비활성화는 UX 방어이고, 실제 어뷰징 방지는 반드시 백엔드/DB에서도 처리한다.
+- 재화 변경은 가능한 경우 DB Atomic Update를 사용한다.
+- 여러 상태를 함께 확인해야 하는 세션 변경은 필요한 구간에서만 `SELECT ... FOR UPDATE`를 검토한다.
+- 하루 한 번처럼 유일성 자체가 규칙이면 DB UNIQUE 제약을 우선 활용한다.
+- 시나리오가 확정되기 전에는 코드에 미정 규칙을 임의로 넣지 않는다.
+
+> 현재는 설계·학습용 임시 문서입니다. 이후 팀에서 규칙을 확정하면 이 문서들을 API 명세와 테스트 케이스의 기준으로 사용합니다.
