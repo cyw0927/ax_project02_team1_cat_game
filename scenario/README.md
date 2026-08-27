@@ -66,6 +66,11 @@
 - `35_input_validation_policy.md` : 형식·존재·상태·권한·비즈니스 규칙 순서의 서버 입력 검증 기준
 - `36_delete_soft_delete_policy.md` : TASKS/ITEMS/CATS/기록성 데이터의 물리삭제·비활성화 선택 기준
 - `37_failure_recovery_pending_stuck_policy.md` : BackgroundTasks 유실, 오래된 PENDING/RUNNING, SYSTEM_ERROR 전환과 복구 기준
+- `38_websocket_reconnect_state_sync.md` : WebSocket 단절 후 재접속, DB snapshot 복구, commit 후 broadcast 원칙
+- `39_battle_score_duplicate_defense.md` : 배틀 문제별 중복 득점 방지와 현재 ERD의 기록 한계, 대안 비교
+- `40_reward_exactly_once_design.md` : 출석·학습·배틀·승급전의 보상 1회 지급과 재처리 안전성 기준
+- `41_auth_jwt_detailed_flow.md` : 회원가입/로그인/JWT/user_id 제거/401·403/WebSocket 인증 상세 흐름
+- `42_admin_master_data_operation_policy.md` : TASKS/ITEMS/CATS 등 마스터데이터와 관리자 권한·비활성화 운영 기준
 
 ## 현재 작성된 상세 시나리오
 
