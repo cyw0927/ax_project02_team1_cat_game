@@ -42,6 +42,10 @@ class AssignRoomTaskRequest(BaseModel):
     task_order: int = Field(ge=1)
 
 
+class RemoveRoomTaskRequest(BaseModel):
+    user_id: uuid.UUID
+
+
 @router.get("/rooms")
 def get_rooms(db: Session = Depends(get_db)):
     rooms = db.scalars(select(Room).order_by(Room.title)).all()
@@ -448,6 +452,54 @@ def assign_room_task(
         "room_id": room_task.room_id,
         "task_id": room_task.task_id,
         "task_order": room_task.task_order,
+    }
+
+
+@router.delete("/rooms/{room_id}/tasks/{task_id}")
+def remove_room_task(
+    room_id: uuid.UUID,
+    task_id: uuid.UUID,
+    payload: RemoveRoomTaskRequest,
+    db: Session = Depends(get_db),
+):
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+
+    if payload.user_id != room.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the room host can remove tasks",
+        )
+
+    if room.status != "WAITING":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Tasks can only be removed while room is waiting",
+        )
+
+    room_task = db.scalar(
+        select(RoomTask).where(
+            RoomTask.room_id == room_id,
+            RoomTask.task_id == task_id,
+        )
+    )
+    if room_task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room task not found",
+        )
+
+    db.delete(room_task)
+    db.commit()
+
+    return {
+        "room_id": room_id,
+        "task_id": task_id,
+        "removed": True,
     }
 
 
