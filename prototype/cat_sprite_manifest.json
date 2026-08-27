@@ -1,0 +1,10 @@
+{
+  "default": {
+    "label": "orange-tabby-reference",
+    "source": "inherited",
+    "frames": 5,
+    "layout": "horizontal",
+    "note": "현재 하우스 프로토타입의 주황 고양이 스프라이트를 그대로 사용합니다."
+  },
+  "cats": {}
+}
