@@ -17,6 +17,19 @@ class AttemptRequest(BaseModel):
     submitted_code: str
 
 
+@router.get("/concepts")
+def get_concepts(db: Session = Depends(get_db)):
+    concepts = db.scalars(select(Concept).order_by(Concept.id)).all()
+
+    return [
+        {
+            "id": concept.id,
+            "name": concept.name,
+        }
+        for concept in concepts
+    ]
+
+
 @router.get("/tasks")
 def get_tasks(db: Session = Depends(get_db)):
     tasks = db.scalars(
