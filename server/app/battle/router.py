@@ -32,6 +32,10 @@ class StartRoomRequest(BaseModel):
     user_id: uuid.UUID
 
 
+class FinishRoomRequest(BaseModel):
+    user_id: uuid.UUID
+
+
 @router.get("/rooms")
 def get_rooms(db: Session = Depends(get_db)):
     rooms = db.scalars(select(Room).order_by(Room.title)).all()
@@ -229,6 +233,41 @@ def start_room(
         )
 
     room.status = "IN_PROGRESS"
+    db.commit()
+    db.refresh(room)
+
+    return {
+        "id": room.id,
+        "status": room.status,
+    }
+
+
+@router.post("/rooms/{room_id}/finish")
+def finish_room(
+    room_id: uuid.UUID,
+    payload: FinishRoomRequest,
+    db: Session = Depends(get_db),
+):
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+
+    if payload.user_id != room.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the room host can finish the room",
+        )
+
+    if room.status != "IN_PROGRESS":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room is not in progress",
+        )
+
+    room.status = "FINISHED"
     db.commit()
     db.refresh(room)
 
