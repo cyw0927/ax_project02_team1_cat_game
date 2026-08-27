@@ -28,6 +28,10 @@ class SetReadyRequest(BaseModel):
     is_ready: bool
 
 
+class StartRoomRequest(BaseModel):
+    user_id: uuid.UUID
+
+
 @router.get("/rooms")
 def get_rooms(db: Session = Depends(get_db)):
     rooms = db.scalars(select(Room).order_by(Room.title)).all()
@@ -196,6 +200,41 @@ def set_participant_ready(
         "room_id": participant.room_id,
         "user_id": participant.user_id,
         "is_ready": participant.is_ready,
+    }
+
+
+@router.post("/rooms/{room_id}/start")
+def start_room(
+    room_id: uuid.UUID,
+    payload: StartRoomRequest,
+    db: Session = Depends(get_db),
+):
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+
+    if payload.user_id != room.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the room host can start the room",
+        )
+
+    if room.status != "WAITING":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room is not waiting",
+        )
+
+    room.status = "IN_PROGRESS"
+    db.commit()
+    db.refresh(room)
+
+    return {
+        "id": room.id,
+        "status": room.status,
     }
 
 
