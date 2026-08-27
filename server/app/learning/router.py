@@ -134,6 +134,58 @@ def get_user_attempts(
     ]
 
 
+@router.get("/attempts/{attempt_id}")
+def get_attempt_result(
+    attempt_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        select(
+            TaskAttempt.id,
+            TaskAttempt.task_id,
+            Task.concept_id,
+            Task.type,
+            Task.difficulty,
+            TaskAttempt.status,
+            TaskAttempt.is_correct,
+            TaskAttempt.used_hint,
+            TaskAttempt.attempted_at,
+        )
+        .join(Task, Task.id == TaskAttempt.task_id)
+        .where(TaskAttempt.id == attempt_id)
+    ).one_or_none()
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attempt not found",
+        )
+
+    (
+        found_attempt_id,
+        task_id,
+        concept_id,
+        task_type,
+        difficulty,
+        attempt_status,
+        is_correct,
+        used_hint,
+        attempted_at,
+    ) = row
+
+    return {
+        "attempt_id": found_attempt_id,
+        "task_id": task_id,
+        "concept_id": concept_id,
+        "type": task_type,
+        "difficulty": difficulty,
+        "status": attempt_status,
+        "is_correct": is_correct,
+        "used_hint": used_hint,
+        "attempted_at": attempted_at,
+    }
+
+
 @router.post("/attempts")
 def submit_attempt(payload: AttemptRequest, db: Session = Depends(get_db)):
     task = db.scalar(
