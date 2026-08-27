@@ -61,6 +61,11 @@
 - `30_logging_audit_trace_policy.md` : request_id, 주요 이벤트 로그, 감사 추적, 민감정보 비노출 기준
 - `31_config_environment_variable_policy.md` : 환경변수·비밀값·기획 설정값 분리와 개발/테스트/운영 설정 기준
 - `32_seed_data_and_swagger_manual_test.md` : 개발용 seed 데이터 구성과 Swagger `/docs` 수동 테스트 순서
+- `33_api_version_compatibility_policy.md` : API 계약 변경, JWT 전환, 재화 구조 변경 시 프론트 호환성 관리 기준
+- `34_pagination_filter_sort_policy.md` : 목록 API의 page/size, filter, sort, 결과 0건 처리와 안정 정렬 기준
+- `35_input_validation_policy.md` : 형식·존재·상태·권한·비즈니스 규칙 순서의 서버 입력 검증 기준
+- `36_delete_soft_delete_policy.md` : TASKS/ITEMS/CATS/기록성 데이터의 물리삭제·비활성화 선택 기준
+- `37_failure_recovery_pending_stuck_policy.md` : BackgroundTasks 유실, 오래된 PENDING/RUNNING, SYSTEM_ERROR 전환과 복구 기준
 
 ## 현재 작성된 상세 시나리오
 
@@ -78,7 +83,7 @@
 - `04_rank_challenge/D-01_to_D-10_detailed.md` : 승급전 진입/시작, 중복 시작, 문제 조회, 자동 저장, 이어하기, 제출, TIMEOUT, 성공/실패
 
 ### E. 인증
-- `05_auth/E-01_to_E-10_detailed.md` : 회원가입, username 중복, 로그인, JWT, 만료, user_id 위조 방지, 로그아웃, 권한
+- `05_auth/E-01_to_E-10_detailed.md` : 회원가입, 로그인, JWT, 사용자 식별과 권한 처리 시나리오
 
 ### F. 하우징
 - `06_housing/F-01_to_F-10_detailed.md` : 하우스 조회, 가구 소유권, 배치 수량, 이동/회전/삭제, 벽지·바닥, 다른 집 방문
