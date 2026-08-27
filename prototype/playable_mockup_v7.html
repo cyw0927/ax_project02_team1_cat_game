@@ -47,14 +47,14 @@
    const assetBadge=d.createElement('div');assetBadge.className='spriteAssetState fallback';assetBadge.textContent='sprite: default';house.append(assetBadge);
 
    let manifest={default:{source:'inherited',label:'default',frames:5},cats:{}};
-   let currentCat=null;
    const original={
      backgroundImage:cat.style.backgroundImage,
      backgroundSize:cat.style.backgroundSize,
      backgroundRepeat:cat.style.backgroundRepeat,
      backgroundPosition:cat.style.backgroundPosition,
      width:cat.style.width,
-     aspectRatio:cat.style.aspectRatio
+     aspectRatio:cat.style.aspectRatio,
+     filter:cat.style.filter
    };
    try{
      const r=await fetch('cat_sprite_manifest.json',{cache:'no-store'});
@@ -79,14 +79,18 @@
      cat.style.backgroundPosition=original.backgroundPosition;
      cat.style.width=original.width;
      cat.style.aspectRatio=original.aspectRatio;
+     cat.style.filter=original.filter;
    }
    function applyAsset(dbCat){
-     currentCat=dbCat;
      if(!dbCat){resetDefault();assetBadge.textContent='sprite: default · DB 고양이 없음';assetBadge.classList.add('fallback');return}
      const specific=manifest.cats&&manifest.cats[String(dbCat.cat_id)];
      const asset=specific||manifest.default||{source:'inherited'};
+     resetDefault();
+     if(asset.filter)cat.style.filter=asset.filter;
      if(asset.source==='inherited'||!asset.url){
-       resetDefault();assetBadge.textContent=`sprite: ${asset.label||'default'} · cat_id=${dbCat.cat_id}`;assetBadge.classList.add('fallback');return;
+       assetBadge.textContent=`sprite: ${asset.label||'default'} · cat_id=${dbCat.cat_id}`;
+       assetBadge.classList.toggle('fallback',!specific);
+       return;
      }
      const frames=Math.max(1,Number(asset.frames||1));
      cat.style.backgroundImage=`url("${asset.url}")`;
