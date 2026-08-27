@@ -63,6 +63,43 @@ def get_ranking_participants(
     ]
 
 
+@router.get("/users/{user_id}/ranking-groups")
+def get_user_ranking_groups(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    if db.get(User, user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    rows = db.execute(
+        select(
+            RankingGroup.id,
+            RankingGroup.name,
+            RankingGroup.owner_user_id,
+            RankingParticipant.current_rank_score,
+        )
+        .join(
+            RankingParticipant,
+            RankingParticipant.group_id == RankingGroup.id,
+        )
+        .where(RankingParticipant.user_id == user_id)
+        .order_by(RankingGroup.name)
+    ).all()
+
+    return [
+        {
+            "group_id": group_id,
+            "name": name,
+            "owner_user_id": owner_user_id,
+            "current_rank_score": current_rank_score,
+        }
+        for group_id, name, owner_user_id, current_rank_score in rows
+    ]
+
+
 @router.get("/users/{user_id}/rank-challenges")
 def get_user_rank_challenges(
     user_id: uuid.UUID,
