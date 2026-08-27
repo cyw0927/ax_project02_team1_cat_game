@@ -41,6 +41,11 @@
 - `10_cross_domain_data_flow.md` : 학습·경제·가챠·배틀·승급전·인증 연결 구조
 - `11_implementation_order.md` : 실제 백엔드 구현 순서와 선행조건
 - `12_definition_of_done.md` : 기능 하나를 완료했다고 판단하는 기준
+- `13_latest_product_flow.md` : 최신 흐름도 기준 로그인→홈→학습/배틀/승급전→재화→상점/가챠→하우징 연결
+- `14_api_endpoint_inventory.md` : A~H 전체 API 엔드포인트 초안과 사용 테이블 목록
+- `15_db_before_after_examples.md` : 문제 제출, 상점, 출석, 방 입장, 배틀 점수, 승급전, 가챠 등 DB Before/After 예시
+- `16_test_case_matrix.md` : 핵심 정상/예외/동시성/rollback 테스트케이스 목록
+- `17_three_person_execution_board.md` : A/B/C 3명 분업, 구현 순서, 필수 테스트, 리뷰 기준
 
 ## 현재 작성된 상세 시나리오
 
