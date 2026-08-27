@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -13,8 +14,10 @@ router = APIRouter(tags=["learning"])
 
 
 class AttemptRequest(BaseModel):
+    user_id: uuid.UUID
     task_id: uuid.UUID
     submitted_code: str
+    used_hint: bool = False
 
 
 @router.get("/concepts")
@@ -186,8 +189,14 @@ def get_attempt_result(
     }
 
 
-@router.post("/attempts")
+@router.post("/attempts", status_code=status.HTTP_202_ACCEPTED)
 def submit_attempt(payload: AttemptRequest, db: Session = Depends(get_db)):
+    if db.get(User, payload.user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
     task = db.scalar(
         select(Task).where(
             Task.id == payload.task_id,
@@ -201,7 +210,23 @@ def submit_attempt(payload: AttemptRequest, db: Session = Depends(get_db)):
             detail="Active task not found",
         )
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Docker sandbox grading is not connected yet",
+    attempt = TaskAttempt(
+        user_id=payload.user_id,
+        task_id=payload.task_id,
+        submitted_code=payload.submitted_code,
+        status="PENDING",
+        is_correct=False,
+        used_hint=payload.used_hint,
+        attempted_at=datetime.now(timezone.utc),
     )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+
+    return {
+        "attempt_id": attempt.id,
+        "status": attempt.status,
+        "is_correct": attempt.is_correct,
+        "used_hint": attempt.used_hint,
+        "attempted_at": attempt.attempted_at,
+    }
