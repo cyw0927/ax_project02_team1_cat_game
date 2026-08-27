@@ -105,17 +105,21 @@ def join_room(
     payload: JoinRoomRequest,
     db: Session = Depends(get_db),
 ):
-    room = db.get(Room, room_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
     if db.get(User, payload.user_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
+        )
+
+    room = db.scalar(
+        select(Room)
+        .where(Room.id == room_id)
+        .with_for_update()
+    )
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
         )
 
     if room.status != "WAITING":
