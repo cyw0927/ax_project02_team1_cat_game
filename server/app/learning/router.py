@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.learning.models import Task
+from app.learning.models import Concept, Task, UserProficiency
+from app.users.models import User
 
 router = APIRouter(tags=["learning"])
 
@@ -31,6 +32,38 @@ def get_tasks(db: Session = Depends(get_db)):
             "template_code": task.template_code,
         }
         for task in tasks
+    ]
+
+
+@router.get("/users/{user_id}/proficiency")
+def get_user_proficiency(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    if db.get(User, user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    rows = db.execute(
+        select(
+            Concept.id,
+            Concept.name,
+            UserProficiency.proficiency_level,
+        )
+        .join(UserProficiency, UserProficiency.concept_id == Concept.id)
+        .where(UserProficiency.user_id == user_id)
+        .order_by(Concept.id)
+    ).all()
+
+    return [
+        {
+            "concept_id": concept_id,
+            "concept_name": concept_name,
+            "proficiency_level": proficiency_level,
+        }
+        for concept_id, concept_name, proficiency_level in rows
     ]
 
 
