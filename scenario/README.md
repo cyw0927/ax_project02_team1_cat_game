@@ -15,6 +15,7 @@
 
 ## 폴더 구성
 
+- `00_common/` : 모든 기능이 공통으로 따라야 할 비즈니스 규칙, API 계약, 오류, 동시성, Docker, 테스트, Git, DB migration 기준
 - `01_learning_grading/` : 학습 문제 조회, 코드 제출, 비동기 채점, Docker Sandbox, 정답·오답 처리와 보상 시나리오
 - `02_gacha/` : 고양이 뽑기, 재화 차감, 희귀도 추첨, 중복 고양이와 천장 정책 시나리오
 - `03_battle/` : 실시간 배틀 방 생성·입장·준비·시작·점수·종료 및 WebSocket 시나리오
@@ -24,7 +25,24 @@
 - `07_shop/` : 상점 조회, 아이템 구매, 재화 차감, Inventory 반영과 동시성 방어 시나리오
 - `08_attendance/` : 출석 체크, 연속 출석, 하루 1회 보상과 UNIQUE 제약 시나리오
 
-## 현재 작성된 상세 문서
+## 공통 설계 문서
+
+`00_common/`에는 다음 문서가 있다.
+
+- `01_business_rule_decision_checklist.md` : 코딩 전에 팀이 반드시 결정해야 할 미정 규칙
+- `02_api_contract_conventions.md` : Request/Response와 API 계약 공통 기준
+- `03_http_status_and_error_rules.md` : HTTP 상태코드와 오류 응답 통일 기준
+- `04_db_concurrency_transaction_rules.md` : Atomic Update, FOR UPDATE, UNIQUE, transaction 선택 기준
+- `05_docker_grading_architecture.md` : Docker SDK 기반 채점 구조와 보안/자원 제한
+- `06_polling_websocket_rules.md` : 채점 polling과 배틀 WebSocket 역할 구분
+- `07_test_strategy.md` : 정상/예외/동시성/rollback/통합 테스트 방법
+- `08_team_work_and_git.md` : 3명 분업, branch, PR, migration 충돌 방지
+- `09_db_constraint_and_migration_checklist.md` : UNIQUE/FK/NULL/CHECK/Alembic 확인사항
+- `10_cross_domain_data_flow.md` : 학습·경제·가챠·배틀·승급전·인증 연결 구조
+- `11_implementation_order.md` : 실제 백엔드 구현 순서와 선행조건
+- `12_definition_of_done.md` : 기능 하나를 완료했다고 판단하는 기준
+
+## 현재 작성된 상세 시나리오
 
 ### A. 학습·채점
 - `01_learning_grading/A-01_task_detail_view.md` : 문제 하나를 정상적으로 여는 과정
