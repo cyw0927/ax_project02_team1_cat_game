@@ -73,7 +73,7 @@ def run_python_code(
 
     nano_cpus = int(cpu_count * 1_000_000_000)
     container_name = f"cat-game-sandbox-{uuid.uuid4().hex}"
-    client = docker.from_env()
+    client = None
     container = None
 
     stdout_buffer = bytearray()
@@ -124,6 +124,12 @@ def run_python_code(
             return
 
     try:
+        try:
+            client = docker.from_env()
+            client.ping()
+        except DockerException as exc:
+            raise SandboxError("Docker engine is not available") from exc
+
         try:
             container = client.containers.run(
                 image=image,
@@ -186,4 +192,5 @@ def run_python_code(
     finally:
         if container is not None:
             _remove_container(container)
-        client.close()
+        if client is not None:
+            client.close()
