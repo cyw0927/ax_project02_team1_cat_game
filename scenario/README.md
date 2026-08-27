@@ -51,6 +51,11 @@
 - `20_state_transition_tables.md` : TASK_ATTEMPTS, ROOMS, RANK_CHALLENGES 등 상태 전이 허용/금지 규칙
 - `21_frontend_reaction_rules.md` : 로딩, 버튼 잠금, polling, WebSocket, 실패 후 화면 처리 기준
 - `22_reward_and_currency_write_points.md` : 학습·출석·배틀·승급전 보상과 상점·가챠 재화 차감 지점 및 중복 방어
+- `23_table_crud_matrix.md` : 19개 ERD 테이블별 Read/Create/Update/Delete 사용처와 담당 도메인
+- `24_api_dependency_graph.md` : API가 인증, DB, Sandbox, 경제, WebSocket 등에 어떻게 의존하는지 정리
+- `25_unresolved_blocker_priority.md` : 개발을 막는 미정 규칙을 P0/P1/P2로 분류하고 결정 순서 제시
+- `26_data_ownership_permission_matrix.md` : 사용자 본인/방장/그룹 owner/관리자의 읽기·쓰기 권한과 ownership 검사 기준
+- `27_transaction_boundary_map.md` : 주요 쓰기 API의 transaction 시작·commit·rollback·lock 경계 정리
 
 ## 현재 작성된 상세 시나리오
 
