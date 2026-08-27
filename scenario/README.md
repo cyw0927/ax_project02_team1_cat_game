@@ -56,6 +56,11 @@
 - `25_unresolved_blocker_priority.md` : 개발을 막는 미정 규칙을 P0/P1/P2로 분류하고 결정 순서 제시
 - `26_data_ownership_permission_matrix.md` : 사용자 본인/방장/그룹 owner/관리자의 읽기·쓰기 권한과 ownership 검사 기준
 - `27_transaction_boundary_map.md` : 주요 쓰기 API의 transaction 시작·commit·rollback·lock 경계 정리
+- `28_time_timezone_policy.md` : UTC/KST 저장·표시·일일 초기화·출석/만료 판정 기준
+- `29_idempotency_duplicate_request_policy.md` : 버튼 연타, 네트워크 재전송, 중복 보상/구매/가챠 요청 방어 기준
+- `30_logging_audit_trace_policy.md` : request_id, 주요 이벤트 로그, 감사 추적, 민감정보 비노출 기준
+- `31_config_environment_variable_policy.md` : 환경변수·비밀값·기획 설정값 분리와 개발/테스트/운영 설정 기준
+- `32_seed_data_and_swagger_manual_test.md` : 개발용 seed 데이터 구성과 Swagger `/docs` 수동 테스트 순서
 
 ## 현재 작성된 상세 시나리오
 
