@@ -1,20 +1,37 @@
 # 07. 상점
 
-이 폴더는 사용자가 상점에서 아이템을 조회하고 재화를 사용해 구매한 뒤 인벤토리에 반영하는 흐름을 설명합니다.
+사용자가 상점에서 아이템을 조회하고 재화를 사용해 구매한 뒤 Inventory에 반영하는 흐름을 정리한 폴더입니다.
 
-주요 내용은 다음과 같습니다.
+## 문서 읽는 순서
 
-- 상점 아이템 조회
-- 카테고리별 필터링
-- 구매 확인
-- 아이템 가격 조회
-- DB Atomic Update를 이용한 안전한 재화 차감
-- 잔액 부족 처리
-- 동일 아이템 재구매 시 quantity 증가
-- 구매 버튼 연타와 동시 요청 방어
-- 처리 도중 오류가 발생했을 때 전체 트랜잭션 롤백
-- 구매 후 현재 잔액과 보유 수량을 프론트에 반영
+1. `G-01_to_G-10_detailed.md` : 상점 조회·구매·동시성·rollback 시나리오
+2. `API_SPEC_DRAFT.md` : 상점 API 계약 초안
+3. `DB_BEFORE_AFTER.md` : 재화 차감·Inventory 변화 전후 DB 비교
+4. `TEST_CASES.md` : `NOW / AFTER / POLICY` 테스트 목록
 
-주요 테이블: `USERS`, `ITEMS`, `INVENTORIES`
+## 현재 main 구현 상태
 
-재화 차감은 Python에서 잔액을 읽어 계산하지 않고 DB의 `UPDATE ... WHERE balance >= price` 방식으로 처리하며, 이 시나리오에서는 `FOR UPDATE`를 사용하지 않습니다.
+```text
+GET /items                      DONE
+GET /users/{user_id}/inventory DONE
+POST /shop/buy                  DONE
+서버 ITEMS.price 기준          DONE
+Atomic conditional UPDATE      DONE
+Inventory upsert               DONE
+JWT 사용자 식별               MISSING
+다수 구매/판매중지/환불        POLICY
+다중 재화                      POLICY
+```
+
+## 핵심 기준
+
+- 프론트가 가격을 보내지 않고 서버의 `ITEMS.price`를 사용합니다.
+- 재화 차감은 `UPDATE ... WHERE balance >= price` 방식의 Atomic UPDATE를 사용합니다.
+- 이 단순 재화 차감 시나리오에서는 `FOR UPDATE`를 기본으로 사용하지 않습니다.
+- balance 차감과 Inventory upsert는 같은 transaction에서 처리합니다.
+- 중간 실패 시 사용자가 돈만 잃거나 item만 얻는 반쪽 상태가 없어야 합니다.
+- 동일 item 재구매는 `(user_id,item_id)` UNIQUE와 upsert로 quantity를 증가시킵니다.
+
+주요 테이블: `USERS`, `ITEMS`, `INVENTORIES`.
+
+현재 상점 핵심 transaction은 이미 구현돼 있으므로 재화 정책이 확정되기 전 불필요하게 구조를 다시 만들지 않습니다.
