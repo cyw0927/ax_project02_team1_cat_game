@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat Game Playable Mockup v13 - Starter Cat Provisioning</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#2d241d}#game{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body>
+<iframe id="game" src="playable_mockup_v12.html" title="Cat Game Playable Prototype v13"></iframe>
+<script>
+(()=>{
+ const API='http://127.0.0.1:8000';
+ const frame=document.getElementById('game');
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ async function until(fn,limit=22000){const t=performance.now();while(performance.now()-t<limit){const v=fn();if(v)return v;await wait(60)}throw new Error('v13 init timeout')}
+ frame.addEventListener('load',async()=>{
+  try{
+   let d=frame.contentDocument;
+   for(let i=0;i<8;i++){const f=await until(()=>d&&d.getElementById('game'));d=f.contentDocument}
+   const userInput=d.getElementById('catUser');
+   const loadBtn=d.getElementById('catLoad');
+   const house=d.getElementById('house');
+   if(!userInput||!loadBtn||!house)return;
+
+   const style=d.createElement('style');
+   style.textContent='.starterCatBadge{position:absolute;right:2%;top:3%;z-index:10070;padding:6px 10px;border:2px solid #7b4b28;border-radius:14px;background:#fff4dcef;font-size:11px;font-weight:900;box-shadow:0 5px 16px #0002}';
+   d.head.append(style);
+   const badge=d.createElement('div');badge.className='starterCatBadge';badge.textContent='🟠 스타터 고양이 확인 대기';house.append(badge);
+
+   let bypass=false;
+   async function ensureStarter(){
+     const uid=userInput.value.trim()||localStorage.getItem('catGameApiUserId')||'';
+     if(!uid){badge.textContent='🟠 UUID 입력 시 스타터 고양이 지급';return false}
+     badge.textContent='🟠 스타터 고양이 확인 중…';
+     try{
+       const r=await fetch(API+'/users/'+encodeURIComponent(uid)+'/cats/starter',{method:'POST'});
+       const data=await r.json().catch(()=>({}));
+       if(!r.ok){badge.textContent=`🟠 스타터 지급 실패 ${r.status}`;return false}
+       badge.textContent=`🟠 ${data.name||'주황 고양이'} 기본 지급 보장됨`;
+       return true;
+     }catch(e){badge.textContent='🟠 FastAPI 연결 실패';return false}
+   }
+
+   loadBtn.addEventListener('click',async e=>{
+     if(bypass){bypass=false;return}
+     e.preventDefault();e.stopImmediatePropagation();
+     const ok=await ensureStarter();
+     if(ok){bypass=true;loadBtn.click()}
+   },true);
+
+   userInput.addEventListener('change',async()=>{
+     const ok=await ensureStarter();
+     if(ok){bypass=true;loadBtn.click()}
+   });
+
+   if(userInput.value.trim()||localStorage.getItem('catGameApiUserId')){
+     const ok=await ensureStarter();
+     if(ok){bypass=true;loadBtn.click()}
+   }
+  }catch(err){console.error(err)}
+ });
+})();
+</script>
+</body>
+</html>
