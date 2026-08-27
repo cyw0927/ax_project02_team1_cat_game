@@ -23,13 +23,13 @@
 - `05_auth/` : 회원가입, 로그인, JWT, 사용자 식별과 권한 처리 시나리오
 - `06_housing/` : 하우스 조회, 가구 배치·이동·회전·삭제, 벽지·바닥 적용 시나리오
 - `07_shop/` : 상점 조회, 아이템 구매, 재화 차감, Inventory 반영과 동시성 방어 시나리오
-- `08_attendance/` : 출석 체크, 연속 출석, 하루 1회 보상과 UNIQUE 제약 시나리오
+- `08_attendance/` : 매일 자정 이후 첫 로그인 자동 출석, 100원 보상, 연속 출석과 UNIQUE 중복 방어 시나리오
 
 ## 공통 설계 문서
 
 `00_common/`에는 다음 문서가 있다.
 
-- `01_business_rule_decision_checklist.md` : 코딩 전에 팀이 반드시 결정해야 할 미정 규칙
+- `01_business_rule_decision_checklist.md` : 코딩 전에 팀이 반드시 결정해야 할 미정 규칙과 확정된 출석 규칙
 - `02_api_contract_conventions.md` : Request/Response와 API 계약 공통 기준
 - `03_http_status_and_error_rules.md` : HTTP 상태코드와 오류 응답 통일 기준
 - `04_db_concurrency_transaction_rules.md` : Atomic Update, FOR UPDATE, UNIQUE, transaction 선택 기준
@@ -71,6 +71,11 @@
 - `40_reward_exactly_once_design.md` : 출석·학습·배틀·승급전의 보상 1회 지급과 재처리 안전성 기준
 - `41_auth_jwt_detailed_flow.md` : 회원가입/로그인/JWT/user_id 제거/401·403/WebSocket 인증 상세 흐름
 - `42_admin_master_data_operation_policy.md` : TASKS/ITEMS/CATS 등 마스터데이터와 관리자 권한·비활성화 운영 기준
+- `43_websocket_event_contract.md` : 배틀 WebSocket 공통 envelope와 joined/ready/start/score/finish 이벤트 계약 초안
+- `44_background_task_lifecycle.md` : PENDING 접수부터 BackgroundTask, semaphore, Docker, 최종상태 저장까지 채점 생명주기
+- `45_security_abuse_rate_limit_policy.md` : 중복요청·API 폭주·Docker 자원·WebSocket/LLM 어뷰징을 계층별로 막는 기준
+- `46_db_index_performance_checklist.md` : 19개 테이블의 query pattern을 기준으로 한 index 후보와 N+1/성능 점검 기준
+- `47_end_to_end_integration_scenarios.md` : 로그인·출석·학습·보상·상점·가챠·하우징·배틀·승급전을 잇는 E2E 통합 테스트 흐름
 
 ## 현재 작성된 상세 시나리오
 
@@ -97,7 +102,7 @@
 - `07_shop/G-01_to_G-10_detailed.md` : 상품 조회, 구매 모달, Atomic Update, 잔액 부족, 연타, Inventory upsert, rollback
 
 ### H. 출석
-- `08_attendance/H-01_to_H-10_detailed.md` : 첫 출석, 연속 출석, 중복 요청, UNIQUE, 보상 transaction, 자정/timezone
+- `08_attendance/H-01_to_H-10_detailed.md` : 자정 이후 첫 로그인 자동 출석, 100원 보상, streak, 중복 처리, rollback, timezone
 
 ## 작성 원칙
 
