@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat Game Playable Mockup v14 - Instant Starter Cat</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#2d241d}#game{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body>
+<iframe id="game" src="playable_mockup_v13.html" title="Cat Game Playable Prototype v14"></iframe>
+<script>
+(()=>{
+ const frame=document.getElementById('game');
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ async function until(fn,limit=24000){const t=performance.now();while(performance.now()-t<limit){const v=fn();if(v)return v;await wait(60)}throw new Error('v14 init timeout')}
+ frame.addEventListener('load',async()=>{
+  try{
+   let d=frame.contentDocument;
+   for(let i=0;i<9;i++){const f=await until(()=>d&&d.getElementById('game'));d=f.contentDocument}
+   const userInput=d.getElementById('catUser');
+   const loadBtn=d.getElementById('catLoad');
+   const house=d.getElementById('house');
+   const stage=d.getElementById('stage');
+   const starterBadge=d.querySelector('.starterCatBadge');
+   const baseCat=d.getElementById('catV2');
+   if(!userInput||!loadBtn||!house||!stage||!baseCat)return;
+
+   const localBadge=d.createElement('div');
+   Object.assign(localBadge.style,{position:'absolute',left:'2%',top:'3%',zIndex:'10080',padding:'6px 10px',border:'2px solid #7b4b28',borderRadius:'14px',background:'#fff4dcef',fontSize:'11px',fontWeight:'900',boxShadow:'0 5px 16px #0002'});
+   house.append(localBadge);
+
+   function hasUser(){return Boolean(userInput.value.trim()||localStorage.getItem('catGameApiUserId'))}
+   function syncStarterMode(){
+     const dbMode=hasUser();
+     if(dbMode){
+       baseCat.style.display='none';
+       localBadge.textContent='🟠 DB 고양이 모드';
+       if(starterBadge)starterBadge.style.display='block';
+     }else{
+       baseCat.style.display='block';
+       localBadge.textContent='🟠 기본 주황 고양이 · 바로 플레이 가능';
+       if(starterBadge)starterBadge.style.display='none';
+     }
+   }
+
+   syncStarterMode();
+   userInput.addEventListener('input',syncStarterMode);
+   userInput.addEventListener('change',()=>setTimeout(syncStarterMode,180));
+   loadBtn.addEventListener('click',()=>setTimeout(syncStarterMode,300));
+   window.addEventListener('storage',syncStarterMode);
+  }catch(err){console.error(err)}
+ });
+})();
+</script>
+</body>
+</html>
