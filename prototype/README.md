@@ -1,6 +1,6 @@
 # 플레이어블 프로토타입
 
-현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v7.html`입니다.
+현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v8.html`입니다.
 
 ## 실행
 
@@ -38,60 +38,36 @@ python -m http.server 5500
 
 `playable_mockup_v7.html`부터 `cat_sprite_manifest.json`을 사용합니다.
 
-현재 manifest에는 실제로 확보된 주황 고양이 스프라이트만 기본값으로 등록되어 있습니다. 다른 DB 고양이의 외형을 이름이나 rarity만 보고 임의 생성하지 않습니다.
+현재 프로토타입 매핑은 다음과 같습니다.
 
-현재 구조:
+- 기본 / cat_id 1 미리보기: 주황 고양이
+- cat_id 2: 검은 고양이 프로토타입
+- cat_id 3: 흰 고양이 프로토타입
 
-```json
-{
-  "default": {
-    "label": "orange-tabby-reference",
-    "source": "inherited",
-    "frames": 5,
-    "layout": "horizontal"
-  },
-  "cats": {}
-}
-```
+현재 검정/흰색은 실제 전용 PNG가 GitHub에 들어오기 전까지 기존 5프레임 모션에 색상 필터를 적용합니다. 실제 자산 파일을 추가하면 manifest의 `source`와 `url`만 교체해 같은 동작 코드에서 전용 스프라이트를 사용할 수 있습니다.
 
-나중에 실제 스프라이트 파일을 `prototype/assets/cats/` 등에 추가한 뒤 `cat_id`별로 다음처럼 등록할 수 있습니다.
-
-```json
-{
-  "cats": {
-    "3": {
-      "label": "cat-3",
-      "source": "file",
-      "url": "assets/cats/cat_3_walk.png",
-      "frames": 5,
-      "layout": "horizontal",
-      "aspectRatio": "50/44"
-    }
-  }
-}
-```
-
-선택된 DB 고양이에 전용 asset이 있으면 해당 파일로 교체하고, 없으면 default 주황 캐릭터를 그대로 사용합니다. 화면에는 현재 적용 중인 asset과 `cat_id`가 표시됩니다.
+`playable_mockup_v8.html`에는 DB와 별개인 개발용 외형 미리보기 패널이 있습니다. House 화면 아래의 `주황 / 검정 / 흰색` 버튼으로 세 외형을 즉시 바꿔서 manifest 매핑과 렌더링을 확인할 수 있습니다.
 
 ## 파일 관계
 
 ```text
 index.html
-└─ playable_mockup_v7.html          # cat_id → sprite asset 매핑
-   └─ playable_mockup_v6.html       # 실제 보유 고양이 연결
-      └─ playable_mockup_v5.html    # 실제 하우징 연결
-         └─ playable_mockup_v4.html # 실제 상점 연결
-            └─ playable_mockup_v3.html # 실제 학습 연결
-               └─ playable_mockup_v2.html
-                  └─ house_motion_mockup_v4.html
-                     └─ house_motion_mockup_v3.html
-                        └─ house_motion_mockup_v2.html
-                           └─ house_motion_mockup.html
+└─ playable_mockup_v8.html          # 주황/검정/흰색 외형 미리보기
+   └─ playable_mockup_v7.html       # cat_id → sprite asset 매핑
+      └─ playable_mockup_v6.html    # 실제 보유 고양이 연결
+         └─ playable_mockup_v5.html # 실제 하우징 연결
+            └─ playable_mockup_v4.html # 실제 상점 연결
+               └─ playable_mockup_v3.html # 실제 학습 연결
+                  └─ playable_mockup_v2.html
+                     └─ house_motion_mockup_v4.html
+                        └─ house_motion_mockup_v3.html
+                           └─ house_motion_mockup_v2.html
+                              └─ house_motion_mockup.html
 ```
 
 ## 다음 구현 후보
 
-1. 실제 고양이별 스프라이트 자산 추가
+1. 검은/흰 고양이 실제 PNG 스프라이트 파일을 `assets/cats/`에 추가
 2. 여러 보유 고양이 동시 하우스 배치 규칙 확정 후 구현
 3. 학습 `PENDING` → Docker 채점 결과 연결
 4. JWT 사용자 식별 연결
