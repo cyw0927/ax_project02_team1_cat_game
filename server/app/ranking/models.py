@@ -1,7 +1,15 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +32,9 @@ class RankingGroup(Base):
 
 class RankingParticipant(Base):
     __tablename__ = "ranking_participants"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_ranking_participant_user"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -60,6 +71,14 @@ class RankChallenge(Base):
 
 class RankChallengeTask(Base):
     __tablename__ = "rank_challenge_tasks"
+    __table_args__ = (
+        UniqueConstraint(
+            "challenge_id", "task_id", name="uq_rank_challenge_task"
+        ),
+        UniqueConstraint(
+            "challenge_id", "task_order", name="uq_rank_challenge_task_order"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +25,9 @@ class Room(Base):
 
 class RoomParticipant(Base):
     __tablename__ = "room_participants"
+    __table_args__ = (
+        UniqueConstraint("room_id", "user_id", name="uq_room_participant_user"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -44,6 +47,10 @@ class RoomParticipant(Base):
 
 class RoomTask(Base):
     __tablename__ = "room_tasks"
+    __table_args__ = (
+        UniqueConstraint("room_id", "task_id", name="uq_room_task_task"),
+        UniqueConstraint("room_id", "task_order", name="uq_room_task_order"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
