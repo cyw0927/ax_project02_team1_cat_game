@@ -36,6 +36,12 @@ class FinishRoomRequest(BaseModel):
     user_id: uuid.UUID
 
 
+class AssignRoomTaskRequest(BaseModel):
+    user_id: uuid.UUID
+    task_id: uuid.UUID
+    task_order: int = Field(ge=1)
+
+
 @router.get("/rooms")
 def get_rooms(db: Session = Depends(get_db)):
     rooms = db.scalars(select(Room).order_by(Room.title)).all()
@@ -362,6 +368,87 @@ def get_room_participants(
         }
         for user_id, username, team_name, current_score, is_ready in rows
     ]
+
+
+@router.post(
+    "/rooms/{room_id}/tasks",
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_room_task(
+    room_id: uuid.UUID,
+    payload: AssignRoomTaskRequest,
+    db: Session = Depends(get_db),
+):
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+
+    if payload.user_id != room.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the room host can assign tasks",
+        )
+
+    if room.status != "WAITING":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Tasks can only be assigned while room is waiting",
+        )
+
+    task = db.scalar(
+        select(Task).where(
+            Task.id == payload.task_id,
+            Task.is_active.is_(True),
+        )
+    )
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active task not found",
+        )
+
+    duplicate_task = db.scalar(
+        select(RoomTask.id).where(
+            RoomTask.room_id == room_id,
+            RoomTask.task_id == payload.task_id,
+        )
+    )
+    if duplicate_task is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Task is already assigned to this room",
+        )
+
+    duplicate_order = db.scalar(
+        select(RoomTask.id).where(
+            RoomTask.room_id == room_id,
+            RoomTask.task_order == payload.task_order,
+        )
+    )
+    if duplicate_order is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Task order is already used in this room",
+        )
+
+    room_task = RoomTask(
+        room_id=room_id,
+        task_id=payload.task_id,
+        task_order=payload.task_order,
+    )
+    db.add(room_task)
+    db.commit()
+    db.refresh(room_task)
+
+    return {
+        "room_task_id": room_task.id,
+        "room_id": room_task.room_id,
+        "task_id": room_task.task_id,
+        "task_order": room_task.task_order,
+    }
 
 
 @router.get("/rooms/{room_id}/tasks")
