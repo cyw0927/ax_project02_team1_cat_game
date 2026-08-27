@@ -46,6 +46,11 @@
 - `15_db_before_after_examples.md` : 문제 제출, 상점, 출석, 방 입장, 배틀 점수, 승급전, 가챠 등 DB Before/After 예시
 - `16_test_case_matrix.md` : 핵심 정상/예외/동시성/rollback 테스트케이스 목록
 - `17_three_person_execution_board.md` : A/B/C 3명 분업, 구현 순서, 필수 테스트, 리뷰 기준
+- `18_api_request_response_examples.md` : 주요 기능별 Request/Response JSON 예시와 JWT 도입 전후 차이
+- `19_failure_case_catalog.md` : A~H 기능별 대표 실패 상황, 추천 HTTP 상태와 화면 반응
+- `20_state_transition_tables.md` : TASK_ATTEMPTS, ROOMS, RANK_CHALLENGES 등 상태 전이 허용/금지 규칙
+- `21_frontend_reaction_rules.md` : 로딩, 버튼 잠금, polling, WebSocket, 실패 후 화면 처리 기준
+- `22_reward_and_currency_write_points.md` : 학습·출석·배틀·승급전 보상과 상점·가챠 재화 차감 지점 및 중복 방어
 
 ## 현재 작성된 상세 시나리오
 
