@@ -14,6 +14,23 @@ SANDBOX_TIMEOUT_SECONDS = os.getenv("SANDBOX_TIMEOUT_SECONDS")
 SANDBOX_MEMORY = os.getenv("SANDBOX_MEMORY", "128m")
 SANDBOX_CPUS = os.getenv("SANDBOX_CPUS", "0.5")
 SANDBOX_OUTPUT_BYTES = os.getenv("SANDBOX_OUTPUT_BYTES")
+SANDBOX_MAX_CONCURRENCY = os.getenv("SANDBOX_MAX_CONCURRENCY", "3")
+
+
+def get_sandbox_max_concurrency() -> int:
+    try:
+        max_concurrency = int(SANDBOX_MAX_CONCURRENCY)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "SANDBOX_MAX_CONCURRENCY must be an integer."
+        ) from exc
+
+    if max_concurrency <= 0:
+        raise RuntimeError(
+            "SANDBOX_MAX_CONCURRENCY must be greater than 0."
+        )
+
+    return max_concurrency
 
 
 def get_sandbox_config() -> dict[str, str | float | int]:
@@ -46,4 +63,5 @@ def get_sandbox_config() -> dict[str, str | float | int]:
         "memory": SANDBOX_MEMORY,
         "cpus": SANDBOX_CPUS,
         "output_bytes": output_bytes,
+        "max_concurrency": get_sandbox_max_concurrency(),
     }
