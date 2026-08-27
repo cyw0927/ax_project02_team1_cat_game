@@ -16,6 +16,7 @@ def test_new_write_routes_are_registered():
     assert ("/users/{user_id}/house/objects/{placed_object_id}", "DELETE") in routes
     assert ("/users/{user_id}/house/wallpaper", "PUT") in routes
     assert ("/users/{user_id}/house/floor", "PUT") in routes
+    assert ("/users/{user_id}/cats/starter", "POST") in routes
     assert ("/ranking-groups/{group_id}/rank-challenges", "POST") in routes
     assert ("/rank-challenges/{challenge_id}/tasks/{task_id}/code", "PUT") in routes
 
