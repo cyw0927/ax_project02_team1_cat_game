@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,12 @@ from app.learning.models import Task
 from app.users.models import User
 
 router = APIRouter(tags=["battle"])
+
+
+class CreateRoomRequest(BaseModel):
+    title: str
+    host_user_id: uuid.UUID
+    max_participants: int = Field(ge=1)
 
 
 @router.get("/rooms")
@@ -26,6 +33,40 @@ def get_rooms(db: Session = Depends(get_db)):
         }
         for room in rooms
     ]
+
+
+@router.post("/rooms", status_code=status.HTTP_201_CREATED)
+def create_room(payload: CreateRoomRequest, db: Session = Depends(get_db)):
+    if db.get(User, payload.host_user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Host user not found",
+        )
+
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Room title must not be empty",
+        )
+
+    room = Room(
+        title=title,
+        host_user_id=payload.host_user_id,
+        status="WAITING",
+        max_participants=payload.max_participants,
+    )
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+
+    return {
+        "id": room.id,
+        "title": room.title,
+        "host_user_id": room.host_user_id,
+        "status": room.status,
+        "max_participants": room.max_participants,
+    }
 
 
 @router.get("/users/{user_id}/rooms")
