@@ -28,6 +28,57 @@ def get_rooms(db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/users/{user_id}/rooms")
+def get_user_rooms(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    if db.get(User, user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    rows = db.execute(
+        select(
+            Room.id,
+            Room.title,
+            Room.host_user_id,
+            Room.status,
+            Room.max_participants,
+            RoomParticipant.team_name,
+            RoomParticipant.current_score,
+            RoomParticipant.is_ready,
+        )
+        .join(RoomParticipant, RoomParticipant.room_id == Room.id)
+        .where(RoomParticipant.user_id == user_id)
+        .order_by(Room.title)
+    ).all()
+
+    return [
+        {
+            "room_id": room_id,
+            "title": title,
+            "host_user_id": host_user_id,
+            "status": room_status,
+            "max_participants": max_participants,
+            "team_name": team_name,
+            "current_score": current_score,
+            "is_ready": is_ready,
+        }
+        for (
+            room_id,
+            title,
+            host_user_id,
+            room_status,
+            max_participants,
+            team_name,
+            current_score,
+            is_ready,
+        ) in rows
+    ]
+
+
 @router.get("/rooms/{room_id}/participants")
 def get_room_participants(
     room_id: uuid.UUID,
