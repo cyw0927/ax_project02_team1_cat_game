@@ -1,84 +1,99 @@
 # 플레이어블 프로토타입
 
-현재 1차 가상구동용 진입점은 `prototype/index.html` 입니다.
+현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v3.html`입니다.
 
 ## 실행 방법
 
-가장 간단한 방법은 저장소를 clone한 뒤 `prototype` 폴더에서 정적 서버를 실행하는 것입니다.
+### 1. FastAPI 서버
+
+```powershell
+cd server
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload
+```
+
+기본 API 주소는 `http://127.0.0.1:8000`입니다.
+
+### 2. 프로토타입 정적 서버
+
+새 터미널에서:
 
 ```powershell
 cd prototype
 python -m http.server 5500
 ```
 
-브라우저에서 아래 주소로 접속합니다.
+브라우저에서:
 
 ```text
-http://localhost:5500/
+http://127.0.0.1:5500/
 ```
 
-`index.html`이 자동으로 열리며 현재 최신 플레이어블 목업인 `playable_mockup_v2.html`을 로드합니다.
+`index.html`이 최신 플레이어블 버전을 자동으로 로드합니다.
 
-> 파일을 더블클릭해서 `file://`로 열 수도 있지만, 브라우저 보안 정책에 따라 iframe/localStorage 동작이 달라질 수 있으므로 정적 서버 실행을 권장합니다.
+## 현재 실제 FastAPI 연결
 
-## 권장 플레이 순서
+학습 화면에서 다음이 실제 백엔드와 연결됩니다.
 
-1. 홈 화면에서 `Study`로 이동합니다.
-2. 정답 `A. Hello, Python!`을 선택하고 제출합니다.
-3. 첫 정답 DEMO 보상으로 사료가 증가하는지 확인합니다.
-4. 홈으로 돌아와 상단 사료 수치가 반영됐는지 확인합니다.
-5. `Daily Quest`에서 진행도를 5/5까지 올립니다.
-6. DEMO 티켓 보상이 지급되는지 확인합니다.
-7. `Gacha`에서 티켓 3장을 사용해 고양이를 획득합니다.
-8. 홈 상단의 보유 고양이 수가 증가했는지 확인합니다.
-9. `House`로 이동해 `우리집 고양이` 목록에 새 고양이가 추가됐는지 확인합니다.
-10. 하우스에서 소파/침대/공부 상호작용과 고양이 클릭 반응을 확인합니다.
-11. 새로고침 후 재화·퀘스트·보유 고양이 상태가 유지되는지 확인합니다.
-12. 홈의 `DEMO 초기화`로 초기 상태 복구를 확인합니다.
+- `GET /` 서버 상태 확인
+- `GET /tasks` 활성 문제 목록 조회
+- 실제 DB에 존재하는 사용자 UUID를 입력한 경우 `POST /attempts`
+- 제출 성공 시 실제 `attempt_id`와 `PENDING` 상태 표시
 
-## 현재 연결된 기능
+현재 백엔드의 채점 worker가 아직 학습 라우터에 연결되지 않았기 때문에 `POST /attempts` 이후 결과가 `PENDING`에 머무를 수 있습니다. 이 상태를 정답으로 가장하거나 DEMO 보상을 지급하지 않습니다.
 
-- 홈 → 학습 / 데일리 퀘스트 / 가챠 / 하우스 화면 전환
-- 학습 DEMO 정답 및 최초 보상 1회 처리
-- 데일리 퀘스트 진행도 및 완료 DEMO 보상
-- 가챠 DEMO 티켓 소비 및 고양이 획득
-- 보유 고양이 수와 하우스 목록 공유
-- localStorage 기반 새로고침 상태 유지
-- 하우스 A* 이동 및 가구 충돌 회피
-- 하우스 자동 산책 및 IDLE 행동
-- 소파 / 침대 / 공부 상호작용
-- 고양이 클릭 말풍선 반응
+프로토타입은 `5500`, FastAPI는 `8000`에서 실행되므로 개발용 CORS 허용 목록에 `localhost:5500`과 `127.0.0.1:5500`이 등록되어 있습니다.
 
-## 중요한 구분
+## 아직 DEMO인 기능
 
-현재 `DEMO`라고 표시된 사료 수치, 티켓 가격, 퀘스트 보상, 가챠 결과는 실제 서비스 경제 규칙이 아닙니다.
+- 학습 정답 보상/재화 증가
+- 데일리 퀘스트
+- 가챠 소비와 결과
+- 가챠로 획득한 고양이 목록 공유
 
-실제 백엔드 API 연결 전까지 플레이 흐름을 검증하기 위한 임시 값이며, 기획이 확정되면 서버 응답 기준으로 교체합니다.
+이 값들은 플레이 흐름 검증용이며 실제 서비스 경제 규칙이 아닙니다.
+
+## 하우스 프로토타입
+
+- A* 이동 경로 탐색
+- 가구 충돌 회피
+- 깊이에 따른 캐릭터 크기 조절
+- 자동 산책과 IDLE 행동
+- 소파 → 앉기
+- 침대 → 자기
+- 공부 지점 → 공부 행동
+- 고양이 클릭 → 말풍선 반응
+
+## 권장 검증 순서
+
+1. FastAPI와 prototype 서버를 둘 다 실행합니다.
+2. 홈에서 `Study`로 이동합니다.
+3. `FastAPI 연결됨` 표시와 실제 `/tasks` 개수를 확인합니다.
+4. DBeaver 등에서 실제 USERS 테이블의 UUID 하나를 입력합니다.
+5. 코드를 제출합니다.
+6. 화면에 실제 `attempt_id`와 `status=PENDING`이 표시되는지 확인합니다.
+7. DB의 `TASK_ATTEMPTS`에 같은 attempt가 생성됐는지 확인합니다.
+8. Home/Daily/Gacha/House DEMO 흐름도 기존처럼 동작하는지 회귀 확인합니다.
+9. House에서 이동과 가구 상호작용을 확인합니다.
 
 ## 파일 관계
 
 ```text
 index.html
-└─ playable_mockup_v2.html
-   └─ house_motion_mockup_v4.html
-      └─ house_motion_mockup_v3.html
-         └─ house_motion_mockup_v2.html
-            └─ house_motion_mockup.html
+└─ playable_mockup_v3.html          # FastAPI 학습 연결
+   └─ playable_mockup_v2.html       # 공유 DEMO 게임 상태
+      └─ house_motion_mockup_v4.html
+         └─ house_motion_mockup_v3.html
+            └─ house_motion_mockup_v2.html
+               └─ house_motion_mockup.html
 ```
 
-앞 버전 파일은 개발 단계 기록 및 회귀 확인용으로 유지합니다. 실제 실행은 `index.html`만 사용하면 됩니다.
+이전 버전은 회귀 확인용으로 유지합니다. 평소에는 `index.html`만 실행하면 됩니다.
 
-## 1차 가상구동 완료 기준
+## 다음 실제 API 교체 순서
 
-아래가 모두 되면 1차 플레이어블 목업을 정상으로 봅니다.
-
-- 화면 이동이 끊기지 않는다.
-- 학습 보상이 중복 지급되지 않는다.
-- 데일리 퀘스트 완료 보상이 한 번만 지급된다.
-- 가챠 시 티켓이 감소하고 고양이가 증가한다.
-- 하우스 목록에 획득 고양이가 반영된다.
-- 새로고침 후 상태가 유지된다.
-- 하우스 캐릭터 이동과 가구 상호작용이 동작한다.
-- DEMO 초기화가 정상 동작한다.
-
-다음 단계에서는 mock 상태를 실제 FastAPI 백엔드 API와 하나씩 교체합니다.
+1. 학습 `PENDING` → Docker 채점 결과 연결
+2. 실제 사용자 식별 방식/JWT 연결
+3. 상점 API 연결
+4. 하우징 API 연결
+5. 가챠 정책 확정 후 가챠 API 연결
