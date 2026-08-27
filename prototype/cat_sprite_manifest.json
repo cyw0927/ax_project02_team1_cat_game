@@ -6,5 +6,22 @@
     "layout": "horizontal",
     "note": "현재 하우스 프로토타입의 주황 고양이 스프라이트를 그대로 사용합니다."
   },
-  "cats": {}
+  "cats": {
+    "2": {
+      "label": "black-cat-prototype",
+      "source": "inherited",
+      "frames": 5,
+      "layout": "horizontal",
+      "filter": "grayscale(1) brightness(0.34) contrast(1.35)",
+      "note": "사용자 지정 두 번째 고양이. 실제 검은 고양이 PNG asset이 들어오기 전까지 동일 모션 스프라이트에 프로토타입 색상 필터를 적용합니다."
+    },
+    "3": {
+      "label": "white-cat-prototype",
+      "source": "inherited",
+      "frames": 5,
+      "layout": "horizontal",
+      "filter": "grayscale(1) brightness(1.9) contrast(0.72)",
+      "note": "사용자 지정 세 번째 고양이. 실제 흰 고양이 PNG asset이 들어오기 전까지 동일 모션 스프라이트에 프로토타입 색상 필터를 적용합니다."
+    }
+  }
 }
