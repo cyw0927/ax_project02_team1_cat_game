@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat Game Playable Mockup v6 - FastAPI Cats Bridge</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#2d241d}#game{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body>
+<iframe id="game" src="playable_mockup_v5.html" title="Cat Game Playable Prototype v6"></iframe>
+<script>
+(()=>{
+ const API='http://127.0.0.1:8000';
+ const frame=document.getElementById('game');
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ async function until(fn,limit=12000){const t=performance.now();while(performance.now()-t<limit){const v=fn();if(v)return v;await wait(60)}throw new Error('v6 init timeout')}
+ frame.addEventListener('load',async()=>{
+  try{
+   const d5=frame.contentDocument;
+   const f4=await until(()=>d5&&d5.getElementById('game'));
+   const d4=f4.contentDocument;
+   const f3=await until(()=>d4&&d4.getElementById('game'));
+   const d3=f3.contentDocument;
+   const f2=await until(()=>d3&&d3.getElementById('game'));
+   const d=f2.contentDocument;
+   const house=await until(()=>d&&d.getElementById('house'));
+   const roster=d.getElementById('rosterList');
+   if(!house||!roster)return;
+
+   const css=d.createElement('style');
+   css.textContent=`
+    .realCatTools{position:absolute;left:1.5%;bottom:1.5%;z-index:10030;width:26%;padding:10px;border:2px solid #714321;border-radius:18px;background:#fff1d9ee;box-shadow:0 8px 20px #0003}
+    .realCatTools input{width:100%;padding:6px;border:1px solid #a77a55;border-radius:9px;margin:5px 0}.realCatTools .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.realCatState{font-size:12px;font-weight:850;margin-top:5px}.catChip.real{cursor:pointer}.catChip.real.active{background:#ffd98f;border:2px solid #8a551f}.catChip.real small{opacity:.7;margin-left:3px}.selectedCatBadge{position:absolute;left:50%;top:9%;z-index:10025;transform:translateX(-50%);padding:7px 12px;border:2px solid #704323;border-radius:999px;background:#fff5ddee;font-weight:950;box-shadow:0 5px 15px #0002;pointer-events:none}
+   `;
+   d.head.append(css);
+
+   const tools=d.createElement('div');tools.className='realCatTools';
+   tools.innerHTML=`<b>🐱 실제 보유 고양이</b><input id="catUser" placeholder="DB user UUID"><div class="row"><button id="catLoad" class="tiny">보유 고양이 불러오기</button><span id="catCount"></span></div><div id="realCatState" class="realCatState">대기 중</div>`;
+   house.append(tools);
+   const badge=d.createElement('div');badge.className='selectedCatBadge';badge.textContent='선택된 DB 고양이 없음';house.append(badge);
+
+   const user=tools.querySelector('#catUser'),status=tools.querySelector('#realCatState'),count=tools.querySelector('#catCount');
+   user.value=localStorage.getItem('catGameApiUserId')||'';
+   user.addEventListener('change',()=>localStorage.setItem('catGameApiUserId',user.value.trim()));
+   let cats=[],selectedId=localStorage.getItem('catGameSelectedUserCatId')||'';
+   const uid=()=>user.value.trim();
+   const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+   function selected(){return cats.find(c=>String(c.user_cat_id)===String(selectedId))||cats[0]||null}
+   function render(){
+    const current=selected();if(current&&!selectedId)selectedId=String(current.user_cat_id);
+    roster.innerHTML=cats.length?cats.map(c=>`<button class="catChip real ${String(c.user_cat_id)===String(selectedId)?'active':''}" data-user-cat="${safe(c.user_cat_id)}">🐱 ${safe(c.name)} <small>${safe(c.rarity)}</small></button>`).join(''):'<span class="catChip">보유 고양이 없음</span>';
+    count.textContent=cats.length?`${cats.length}마리`:'';
+    if(current){badge.textContent=`🐾 현재 캐릭터: ${current.name} · ${current.rarity}`;status.textContent=`선택: ${current.name} / persona=${current.persona||'-'}`}
+    else{badge.textContent='선택된 DB 고양이 없음';status.textContent='DB에 보유 고양이가 없습니다.'}
+   }
+   async function loadCats(){
+    const id=uid();if(!id){status.textContent='사용자 UUID를 입력하세요.';return}
+    status.textContent='실제 보유 고양이 조회 중…';
+    try{
+      const r=await fetch(API+'/users/'+encodeURIComponent(id)+'/cats');const data=await r.json().catch(()=>[]);
+      if(!r.ok){status.textContent=`조회 실패 ${r.status}: ${data.detail||''}`;cats=[];render();return}
+      cats=data;
+      if(!cats.some(c=>String(c.user_cat_id)===String(selectedId)))selectedId=cats[0]?String(cats[0].user_cat_id):'';
+      if(selectedId)localStorage.setItem('catGameSelectedUserCatId',selectedId);else localStorage.removeItem('catGameSelectedUserCatId');
+      render();
+    }catch(e){status.textContent='고양이 API 연결 실패: '+e.message}
+   }
+   roster.addEventListener('click',e=>{const b=e.target.closest('[data-user-cat]');if(!b)return;e.preventDefault();selectedId=b.dataset.userCat;localStorage.setItem('catGameSelectedUserCatId',selectedId);render()});
+   tools.querySelector('#catLoad').addEventListener('click',e=>{e.preventDefault();loadCats()});
+   if(uid())loadCats();
+  }catch(err){console.error(err)}
+ });
+})();
+</script>
+</body>
+</html>
