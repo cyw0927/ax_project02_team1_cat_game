@@ -1,10 +1,8 @@
 # 플레이어블 프로토타입
 
-현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v6.html`입니다.
+현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v7.html`입니다.
 
-## 실행 방법
-
-### 1. FastAPI 서버
+## 실행
 
 ```powershell
 cd server
@@ -12,132 +10,89 @@ cd server
 uvicorn app.main:app --reload
 ```
 
-기본 API 주소는 `http://127.0.0.1:8000`입니다.
-
-### 2. 프로토타입 정적 서버
-
-새 터미널에서:
+새 터미널:
 
 ```powershell
 cd prototype
 python -m http.server 5500
 ```
 
-브라우저에서:
-
-```text
-http://127.0.0.1:5500/
-```
-
-`index.html`이 최신 플레이어블 버전을 자동으로 로드합니다.
+브라우저에서 `http://127.0.0.1:5500/`을 엽니다.
 
 ## 현재 실제 FastAPI 연결
 
-### 학습
+- 학습: `GET /tasks`, `POST /attempts`
+- 상점: `GET /items`, `POST /shop/buy`, `GET /users/{user_id}/inventory`
+- 하우징: house 조회, 가구 배치/이동/삭제, wallpaper/floor 적용
+- 보유 고양이: `GET /users/{user_id}/cats`
 
-- `GET /` 서버 상태 확인
-- `GET /tasks` 활성 문제 목록 조회
-- 실제 DB에 존재하는 사용자 UUID를 입력한 경우 `POST /attempts`
-- 제출 성공 시 실제 `attempt_id`와 `PENDING` 상태 표시
+학습 채점 worker는 아직 연결 전이라 attempt가 `PENDING`에 머무를 수 있습니다. 데일리 퀘스트와 가챠는 아직 DEMO입니다.
 
-현재 백엔드의 채점 worker가 아직 학습 라우터에 연결되지 않았기 때문에 `POST /attempts` 이후 결과가 `PENDING`에 머무를 수 있습니다. 이 상태를 정답으로 가장하거나 DEMO 보상을 지급하지 않습니다.
+## 하우스 캐릭터
 
-### 상점
+현재 하우스 캐릭터는 A* 이동, 가구 충돌 회피, 자동 산책, IDLE 행동, 소파/침대/공부 상호작용, 말풍선 반응을 지원합니다.
 
-- `GET /items` 실제 아이템 목록 조회
-- `POST /shop/buy` 실제 구매
-- `GET /users/{user_id}/inventory` 실제 인벤토리 조회
-- 구매 성공 시 서버가 반환한 실제 DB 잔액과 보유 수량 표시
-- 잔액 부족, 사용자 없음, 아이템 없음 등의 서버 오류를 그대로 표시
+실제 USER_CATS 목록을 roster에 표시하고 한 마리를 선택할 수 있습니다. 선택한 `user_cat_id`는 localStorage에 저장됩니다.
 
-상점의 실제 DB 재화와 홈 화면의 DEMO 사료 숫자는 서로 섞지 않습니다.
+## 고양이 스프라이트 자산 매핑
 
-### 하우징
+`playable_mockup_v7.html`부터 `cat_sprite_manifest.json`을 사용합니다.
 
-- `GET /users/{user_id}/house` 실제 하우스 상태 조회
-- `GET /users/{user_id}/inventory`에서 실제 보유 가구 선택
-- `POST /users/{user_id}/house/objects` 실제 가구 배치
-- `PATCH /users/{user_id}/house/objects/{placed_object_id}` 실제 위치 이동
-- `DELETE /users/{user_id}/house/objects/{placed_object_id}` 실제 배치 제거
-- `PUT /users/{user_id}/house/wallpaper` 실제 벽지 적용
-- `PUT /users/{user_id}/house/floor` 실제 바닥 적용
-- DB의 `position_data.x/y/rotation`을 하우스 화면 위 마커로 시각화
+현재 manifest에는 실제로 확보된 주황 고양이 스프라이트만 기본값으로 등록되어 있습니다. 다른 DB 고양이의 외형을 이름이나 rarity만 보고 임의 생성하지 않습니다.
 
-현재 마커는 실제 가구 이미지가 아니라 DB 배치 좌표 연결 검증용입니다. 가구별 이미지 크기, 충돌 footprint, 회전 규칙은 아직 확정하지 않습니다.
+현재 구조:
 
-### 보유 고양이
+```json
+{
+  "default": {
+    "label": "orange-tabby-reference",
+    "source": "inherited",
+    "frames": 5,
+    "layout": "horizontal"
+  },
+  "cats": {}
+}
+```
 
-- `GET /users/{user_id}/cats` 실제 USER_CATS + CATS 조인 결과 조회
-- 실제 보유 고양이로 하우스 roster 교체
-- `name`, `rarity`, `persona` 표시
-- roster에서 한 마리를 선택하면 현재 움직이는 주황 스프라이트가 어떤 DB 고양이를 대표 중인지 배지로 표시
-- 선택한 `user_cat_id`는 localStorage에 저장해 새로고침 후에도 유지
+나중에 실제 스프라이트 파일을 `prototype/assets/cats/` 등에 추가한 뒤 `cat_id`별로 다음처럼 등록할 수 있습니다.
 
-현재는 고양이별 외형 스프라이트가 준비되지 않았으므로 모든 보유 고양이가 같은 주황 캐릭터 외형을 공유합니다. DB 고양이마다 외형을 임의 생성하거나 이름만 보고 색을 바꾸지 않습니다.
+```json
+{
+  "cats": {
+    "3": {
+      "label": "cat-3",
+      "source": "file",
+      "url": "assets/cats/cat_3_walk.png",
+      "frames": 5,
+      "layout": "horizontal",
+      "aspectRatio": "50/44"
+    }
+  }
+}
+```
 
-프로토타입은 `5500`, FastAPI는 `8000`에서 실행되므로 개발용 CORS 허용 목록에 `localhost:5500`과 `127.0.0.1:5500`이 등록되어 있어야 합니다.
-
-## 아직 DEMO인 기능
-
-- 학습 정답 보상/재화 증가
-- 데일리 퀘스트
-- 가챠 소비와 결과
-- 가챠로 새 USER_CATS를 생성하는 실제 획득 처리
-
-이 값들은 플레이 흐름 검증용이며 실제 서비스 경제 규칙이 아닙니다.
-
-## 하우스 캐릭터 프로토타입
-
-- A* 이동 경로 탐색
-- 가구 충돌 회피
-- 깊이에 따른 캐릭터 크기 조절
-- 자동 산책과 IDLE 행동
-- 소파 → 앉기
-- 침대 → 자기
-- 공부 지점 → 공부 행동
-- 고양이 클릭 → 말풍선 반응
-- 실제 DB에서 선택한 고양이 이름/등급을 현재 움직이는 캐릭터와 연결
-
-## 권장 검증 순서
-
-1. FastAPI와 prototype 서버를 둘 다 실행합니다.
-2. 홈에서 `Study`로 이동합니다.
-3. `FastAPI 연결됨` 표시와 실제 `/tasks` 개수를 확인합니다.
-4. DBeaver 등에서 실제 USERS 테이블의 UUID 하나를 입력합니다.
-5. 코드를 제출하고 실제 `attempt_id`, `status=PENDING`을 확인합니다.
-6. 홈에서 `Shop`으로 이동해 같은 UUID로 실제 구매와 인벤토리 변경을 확인합니다.
-7. `House`로 이동해 같은 UUID로 하우스와 인벤토리를 불러옵니다.
-8. 보유 가구를 좌표에 실제 배치합니다.
-9. 하우스 화면에 DB 위치 마커가 나타나는지 확인합니다.
-10. `+5 X` 이동 후 마커와 DB `position_data`가 함께 바뀌는지 확인합니다.
-11. 삭제 후 `PLACED_OBJECTS`와 화면 마커가 함께 사라지는지 확인합니다.
-12. wallpaper/floor 보유 아이템이 있다면 실제 적용 후 USERS의 surface FK가 바뀌는지 확인합니다.
-13. 같은 UUID로 `보유 고양이 불러오기`를 누릅니다.
-14. DB의 USER_CATS 수와 roster 수가 같은지 확인합니다.
-15. roster에서 고양이를 바꾸면 상단 선택 배지의 이름/rarity가 바뀌는지 확인합니다.
-16. Home/Daily/Gacha DEMO와 하우스 캐릭터 이동/상호작용도 회귀 확인합니다.
+선택된 DB 고양이에 전용 asset이 있으면 해당 파일로 교체하고, 없으면 default 주황 캐릭터를 그대로 사용합니다. 화면에는 현재 적용 중인 asset과 `cat_id`가 표시됩니다.
 
 ## 파일 관계
 
 ```text
 index.html
-└─ playable_mockup_v6.html          # FastAPI 보유 고양이 연결
-   └─ playable_mockup_v5.html       # FastAPI 하우징 연결
-      └─ playable_mockup_v4.html    # FastAPI 상점 연결
-         └─ playable_mockup_v3.html # FastAPI 학습 연결
-            └─ playable_mockup_v2.html # 공유 DEMO 게임 상태
-               └─ house_motion_mockup_v4.html
-                  └─ house_motion_mockup_v3.html
-                     └─ house_motion_mockup_v2.html
-                        └─ house_motion_mockup.html
+└─ playable_mockup_v7.html          # cat_id → sprite asset 매핑
+   └─ playable_mockup_v6.html       # 실제 보유 고양이 연결
+      └─ playable_mockup_v5.html    # 실제 하우징 연결
+         └─ playable_mockup_v4.html # 실제 상점 연결
+            └─ playable_mockup_v3.html # 실제 학습 연결
+               └─ playable_mockup_v2.html
+                  └─ house_motion_mockup_v4.html
+                     └─ house_motion_mockup_v3.html
+                        └─ house_motion_mockup_v2.html
+                           └─ house_motion_mockup.html
 ```
 
-이전 버전은 회귀 확인용으로 유지합니다. 평소에는 `index.html`만 실행하면 됩니다.
+## 다음 구현 후보
 
-## 다음 실제 API 교체 순서
-
-1. 학습 `PENDING` → Docker 채점 결과 연결
-2. 실제 사용자 식별 방식/JWT 연결
-3. 고양이별 실제 스프라이트/외형 자산 매핑
-4. 여러 보유 고양이의 동시 하우스 배치 규칙 확정 후 구현
-5. 가챠 정책 확정 후 가챠 API 연결
+1. 실제 고양이별 스프라이트 자산 추가
+2. 여러 보유 고양이 동시 하우스 배치 규칙 확정 후 구현
+3. 학습 `PENDING` → Docker 채점 결과 연결
+4. JWT 사용자 식별 연결
+5. 가챠 정책 확정 후 실제 가챠 API 연결
