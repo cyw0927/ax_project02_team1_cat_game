@@ -1,6 +1,6 @@
 # 플레이어블 프로토타입
 
-현재 실행 진입점은 `prototype/index.html`이며 최신 버전은 `playable_mockup_v14.html`입니다.
+최신 실행 경로는 `index.html` → `game.html`인 단일 앱입니다. 과거 `playable_mockup_v1~v14.html`과 `house_motion_mockup*`은 비교용 legacy로 보존하지만 최신 앱에서는 iframe으로 불러오지 않습니다.
 
 ## 실행
 
@@ -10,85 +10,53 @@ cd server
 uvicorn app.main:app --reload
 ```
 
-새 터미널:
+별도 터미널에서:
 
 ```powershell
 cd prototype
 python -m http.server 5500
 ```
 
-브라우저에서 `http://127.0.0.1:5500/`을 엽니다.
+브라우저에서 `http://127.0.0.1:5500/`을 엽니다. 우측 아래 톱니바퀴의 Debug 창에서 API 주소와 사용자 UUID를 입력할 수 있습니다. 개발 정보는 기본 게임 화면에 노출되지 않습니다.
 
-## 현재 실제 FastAPI 연결
-
-- 학습: `GET /tasks`, `POST /attempts`
-- 상점: `GET /items`, `POST /shop/buy`, `GET /users/{user_id}/inventory`
-- 하우징: house 조회, 가구 배치/이동/삭제, wallpaper/floor 적용
-- 보유 고양이: `GET /users/{user_id}/cats`
-- 스타터 고양이: `POST /users/{user_id}/cats/starter`
-
-학습 채점 worker는 아직 연결 전이라 attempt가 `PENDING`에 머무를 수 있습니다. 데일리 퀘스트와 가챠는 아직 DEMO입니다.
-
-## 시작 즉시 주황 고양이 v14
-
-게임을 처음 열었을 때 UUID나 DB 설정이 없어도 하우스에서 바로 주황 고양이 한 마리를 보고 플레이할 수 있습니다.
-
-- UUID가 없으면 기존 단일 주황 고양이 `catV2`를 즉시 표시합니다.
-- 이 로컬 스타터는 기존 이동/자동 산책/IDLE/가구 상호작용 로직을 그대로 사용합니다.
-- UUID를 입력하면 로컬 스타터를 숨기고 DB 고양이 모드로 전환합니다.
-- DB 모드에서는 먼저 `POST /users/{user_id}/cats/starter`를 호출해 `cat_id=1` 주황 고양이를 최소 1마리 보장합니다.
-- 이미 `cat_id=1`을 보유한 사용자는 중복 지급하지 않습니다.
-- 스타터 Cat 마스터가 DB에 없으면 기본 이름/페르소나/rarity로 생성한 뒤 지급합니다.
-- 이후 실제 `GET /users/{user_id}/cats` 결과를 사용해 보유 고양이 수만큼 하우스 캐릭터를 생성합니다.
-- 추후 Auth/회원가입 구현 시 같은 starter provisioning 로직을 신규 사용자 생성 트랜잭션으로 옮길 수 있습니다.
-
-## 고양이 실제 스프라이트 자산
-
-- cat_id 1: 기존 주황 고양이
-- cat_id 2: `assets/cats/cat_2_black_walk.webp`
-- cat_id 3: `assets/cats/cat_3_white_walk.webp`
-- 그 외 cat_id: 기본 주황 스프라이트 fallback
-
-검정/흰 고양이는 별도 5프레임 walk strip WebP를 사용합니다.
-
-## DB 멀티고양이 하우스
-
-`playable_mockup_v12.html`의 USER_CATS 기반 동적 생성 로직을 v13/v14가 이어서 사용합니다.
-
-- 실제 `GET /users/{user_id}/cats` 결과 사용
-- 보유 고양이 수만큼 캐릭터 동적 생성
-- 실제 `name`, `rarity`, `cat_id`, `user_cat_id` 표시
-- 각 캐릭터 독립 `IDLE/WALK/SIT/SLEEP/STUDY`
-- 랜덤 산책, 가구 충돌 회피, 고양이 간 최소 거리 조절
-- SIT/SLEEP/STUDY는 현재 CSS 기반 행동 표현
-
-## 파일 관계
+## 구조
 
 ```text
-index.html
-└─ playable_mockup_v14.html            # UUID 없어도 주황 스타터 즉시 플레이
-   └─ playable_mockup_v13.html          # DB 스타터 주황 고양이 자동 보장
-      └─ playable_mockup_v12.html       # USER_CATS 기반 동적 멀티고양이
-         └─ playable_mockup_v9.html     # 실제 검정/흰 WebP asset
-            └─ playable_mockup_v8.html
-               └─ playable_mockup_v7.html  # cat_id → sprite asset 매핑
-                  └─ playable_mockup_v6.html
-                     └─ playable_mockup_v5.html
-                        └─ playable_mockup_v4.html
-                           └─ playable_mockup_v3.html
-                              └─ playable_mockup_v2.html
-                                 └─ house_motion_mockup_v4.html
-                                    └─ house_motion_mockup_v3.html
-                                       └─ house_motion_mockup_v2.html
-                                          └─ house_motion_mockup.html
+prototype/
+├─ index.html                 # game.html 진입점
+├─ game.html                  # 모든 게임 화면의 단일 DOM
+├─ css/game.css               # 게임 UI와 행동 표현
+├─ js/api.js                  # FastAPI 요청
+├─ js/state.js                # 사용자·게임 상태
+├─ js/navigation.js           # 화면 전환과 기능 연결
+├─ js/cat.js                  # cat_id 자산 매핑과 생성
+├─ js/movement.js             # 가속·감속·전환·회피
+└─ assets/                    # 기존 하우스/고양이 자산
 ```
 
-## 다음 구현 후보
+홈에서 `일일 미션 / 학습 / 배틀 / 랭킹·승급전 / 하우징 / 상점 / 가챠` 7개 화면으로 직접 이동합니다. 일일 미션은 일반 학습과 분리되어 있습니다.
 
-1. SIT/SLEEP/STUDY 전용 행동 스프라이트 추가
-2. 학습 `PENDING` → Docker 채점 결과 연결
-3. JWT 사용자 식별과 실제 회원가입 시 starter 지급 연결
-4. 실제 하우스 최대 배치 마릿수/선택 규칙 확정
-5. 가챠 정책 확정 후 실제 가챠 API 연결
+## 실제 FastAPI 연결
 
-행동 스프라이트 생성 시도에서 UI 콜라주 형태 이미지가 생성된 경우에는 게임 자산으로 채택하지 않습니다. 전용 행동 스프라이트는 캐릭터 일관성이 확보된 투명 시트가 준비됐을 때 연결합니다.
+- 학습: `GET /tasks`, `POST /attempts` (`GET /attempts/{attempt_id}` 함수 포함)
+- 상점: `GET /items`, `POST /shop/buy`
+- 인벤토리: `GET /users/{user_id}/inventory` 함수 포함
+- 하우징: 조회, 가구 배치/이동/삭제, wallpaper/floor 적용 함수 포함
+- 보유 고양이: `GET /users/{user_id}/cats`
+- 스타터: `POST /users/{user_id}/cats/starter`
+- 사용자 재화: `GET /users/{user_id}`
+
+UUID가 없으면 로컬 스타터 주황 고양이 한 마리를 즉시 표시합니다. UUID를 연결하면 스타터를 최소 1마리 보장한 뒤 실제 `USER_CATS` 결과로 교체합니다. `cat_id=1`은 주황, `2`는 검정, `3`은 흰색이며 그 외는 주황 자산으로 fallback합니다.
+
+고양이는 가속 → 순항 → 감속으로 이동하고, 반대 방향 전환 전에 감속합니다. 목표 방향 보간과 고양이 간 분리 힘으로 경로와 겹침을 완화하며 IDLE 호흡·눈깜빡임도 표현합니다. 확보되지 않은 4방향·행동 스프라이트는 만들지 않았습니다.
+
+## DEMO / 준비중
+
+- 일일 미션 백엔드와 실제 보상
+- 배틀 실시간 점수와 WebSocket
+- 가챠 API, 확률, 비용
+- JWT와 회원가입
+- 랭킹·승급전 최종 규칙 일부
+- 학습 채점 worker (`PENDING`이 유지될 수 있음)
+
+DEMO 버튼은 실제 재화나 DB를 변경하지 않습니다. 미확정 경제·가챠·하우스 규칙도 임의로 확정하지 않습니다.
