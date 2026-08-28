@@ -1,0 +1,4 @@
+import{CatMover}from'./movement.js';
+const assets={1:'assets/cats/cat_1_orange_walk.webp',2:'assets/cats/cat_2_black_walk.webp',3:'assets/cats/cat_3_white_walk.webp'};let movers=[];
+export function renderCats(cats){movers.forEach(m=>m.destroy());movers=[];for(const layer of document.querySelectorAll('.cat-layer')){cats.forEach((cat,index)=>{const el=document.createElement('div');el.className='cat idle';el.style.backgroundImage=`url("${assets[cat.cat_id]||assets[1]}")`;el.setAttribute('aria-label',cat.name||'고양이');el.title=cat.name||'고양이';layer.append(el);const mover=new CatMover(el,index,()=>movers.filter(m=>m.el.parentElement===layer));movers.push(mover)});layer.onpointerdown=e=>{if(e.target.closest('button,aside'))return;const r=layer.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*100,y=(e.clientY-r.top)/r.height*100;movers.filter(m=>m.el.parentElement===layer).forEach((m,i)=>m.setTarget(x+(i-(cats.length-1)/2)*4,y+(i%2)*2))}}
+}
