@@ -1,5 +1,9 @@
 # 01. 학습 문제 제출·채점
 
+이 폴더의 A-01~A-10, API, DB, 테스트 문서는 공통 [`사용자 중심 시나리오 보강 표준`](../00_common/54_user_centered_scenario_upgrade_standard.md)을 적용한다. 제출 연타·응답 유실·Docker 자원 고갈·BackgroundTasks 작업 유실·보상 중복을 화면부터 후속 재화 반영까지 함께 검증한다.
+
+전체 항목별 사고·방어 연결은 [`SCENARIO_RISK_MATRIX.md`](./SCENARIO_RISK_MATRIX.md)에서 검증한다.
+
 사용자가 문제를 열고 코드를 제출한 뒤 비동기 채점 결과와 보상까지 받는 흐름을 정리한 폴더입니다.
 
 ## 문서 읽는 순서

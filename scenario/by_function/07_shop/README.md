@@ -1,5 +1,9 @@
 # 07. 상점
 
+이 폴더의 G-01~G-10, API, DB, 테스트 문서는 공통 [`사용자 중심 시나리오 보강 표준`](../00_common/54_user_centered_scenario_upgrade_standard.md)을 적용한다. 구매 매크로·가격 변경·동시 구매·commit 후 응답 유실을 다루고 조건부 원자 차감과 INVENTORIES 증가를 하나의 짧은 transaction으로 보장한다.
+
+전체 항목별 사고·방어 연결은 [`SCENARIO_RISK_MATRIX.md`](./SCENARIO_RISK_MATRIX.md)에서 검증한다.
+
 사용자가 상점에서 아이템을 조회하고 재화를 사용해 구매한 뒤 Inventory에 반영하는 흐름을 정리한 폴더입니다.
 
 ## 문서 읽는 순서

@@ -1,5 +1,9 @@
 # 05. 로그인·회원가입·인증
 
+이 폴더의 E-01~E-10, API, DB, 테스트 문서는 공통 [`사용자 중심 시나리오 보강 표준`](../00_common/54_user_centered_scenario_upgrade_standard.md)을 적용한다. 가입 연타, 계정 존재 추측, 토큰 만료 중 write, user_id 위조와 여러 기기 로그아웃을 UI·권한·후속 상태까지 연결한다.
+
+전체 항목별 사고·방어 연결은 [`SCENARIO_RISK_MATRIX.md`](./SCENARIO_RISK_MATRIX.md)에서 검증한다.
+
 사용자가 계정을 만들고 로그인한 뒤 JWT 등 인증 정보를 이용해 본인 권한으로 API를 호출하는 흐름을 정리한 폴더입니다.
 
 ## 문서 읽는 순서

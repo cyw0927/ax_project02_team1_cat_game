@@ -1,5 +1,9 @@
 # 03. 실시간 배틀
 
+이 폴더의 C-01~C-10, API, DB, 테스트 문서는 공통 [`사용자 중심 시나리오 보강 표준`](../00_common/54_user_centered_scenario_upgrade_standard.md)을 적용한다. 마지막 한 자리 동시 입장, Ready/시작 경쟁, 제출·점수 중복, 재접속과 종료 경쟁을 서버 권위 상태로 복구한다. 실시간 방식·점수식·AFK·보상은 `TBD`다.
+
+전체 항목별 사고·방어 연결은 [`SCENARIO_RISK_MATRIX.md`](./SCENARIO_RISK_MATRIX.md)에서 검증한다.
+
 사용자가 방을 만들거나 참가하고 Ready 후 문제를 풀며 점수를 경쟁하는 흐름을 정리한 폴더입니다.
 
 ## 문서 읽는 순서

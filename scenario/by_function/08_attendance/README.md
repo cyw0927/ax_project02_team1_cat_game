@@ -1,5 +1,9 @@
 # 08. 출석
 
+이 폴더의 H-01~H-10, API, DB, 테스트 문서는 공통 [`사용자 중심 시나리오 보강 표준`](../00_common/54_user_centered_scenario_upgrade_standard.md)을 적용한다. 23:59→00:01 경계, 두 기기 첫 로그인, 기록 성공 뒤 보상 실패와 응답 유실을 서버 날짜·unique·짧은 transaction으로 검증한다. 일일 미션 완료용 가상 컬럼을 출석 테이블에 만들지 않는다.
+
+전체 항목별 사고·방어 연결은 [`SCENARIO_RISK_MATRIX.md`](./SCENARIO_RISK_MATRIX.md)에서 검증한다.
+
 **매일 자정 이후 첫 로그인 시 자동 출석 1회 + 100원 지급** 흐름을 정리한 폴더입니다.
 
 ## 문서 읽는 순서

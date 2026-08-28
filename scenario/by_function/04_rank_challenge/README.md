@@ -1,5 +1,9 @@
 # 04. 랭킹·승급전
 
+이 폴더의 D-01~D-10, API, DB, 테스트 문서는 공통 [`사용자 중심 시나리오 보강 표준`](../00_common/54_user_centered_scenario_upgrade_standard.md)을 적용한다. 만료 직전 제출, SUCCESS/TIMEOUT 경쟁, 자동 저장 역전, 결과·보상 중복을 다루며 문제 개수·합격 기준·인정 시각·보상은 `TBD`다.
+
+전체 항목별 사고·방어 연결은 [`SCENARIO_RISK_MATRIX.md`](./SCENARIO_RISK_MATRIX.md)에서 검증한다.
+
 사용자가 소규모 랭킹을 확인하고 승급전에 도전해 문제를 풀고 성공/실패 판정을 받는 흐름을 정리한 폴더입니다.
 
 ## 문서 읽는 순서

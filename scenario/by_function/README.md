@@ -1,11 +1,14 @@
 # Scenario
 
+각 기능 폴더의 상세 시나리오·API·DB·테스트 문서는 [`00_common/54_user_centered_scenario_upgrade_standard.md`](./00_common/54_user_centered_scenario_upgrade_standard.md)를 공통 기준으로 읽고 검증한다. 화면 행동부터 실제 사고 상황, 서버 감지·방어, 복구 UI와 다음 기능 영향까지 연결되지 않으면 완료로 보지 않는다.
+
 이 폴더는 백엔드 개발 전에 **사용자 흐름 → API 계약 → DB 변화 → 테스트**를 맞추기 위한 설계 문서 공간입니다.
 
 현재 요구사항 기준 문서 설계는 **완료 상태**이며, 구현 시작 전에는 먼저 다음 문서를 봅니다.
 
 ```text
 00_common/53_design_completion_implementation_handoff.md
+00_common/54_user_centered_scenario_upgrade_standard.md
 ```
 
 이후에는 새 요구사항이 생기지 않는 한 설계 파일을 계속 늘리지 않고, 실제 구현 변화에 맞춰 기존 문서를 갱신합니다.
@@ -71,6 +74,7 @@
 구현 시작 전 핵심 문서:
 
 - `00_common/53_design_completion_implementation_handoff.md` : **설계 종료와 실제 구현 착수 기준**
+- `00_common/54_user_centered_scenario_upgrade_standard.md` : **모든 기능 시나리오의 사용자 사고 상황과 방어 추적 기준**
 - `00_common/25_unresolved_blocker_priority.md` : 실제로 팀이 결정해야 하는 P0/P1/P2
 - `00_common/48_current_backend_implementation_status.md` : 현재 main 코드 상태
 - `00_common/49_schema_gap_register.md` : 19테이블로 부족한 지점

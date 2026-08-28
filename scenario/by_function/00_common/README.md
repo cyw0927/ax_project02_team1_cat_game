@@ -1,8 +1,10 @@
 # 공통 시나리오 설계 문서
 
+모든 기능·API·DB·테스트 문서는 [`54_user_centered_scenario_upgrade_standard.md`](./54_user_centered_scenario_upgrade_standard.md)의 사용자 화면→Worst Case→감지→방어→UI→후속 영향 표준과 미확정 정책 보호선을 함께 적용한다.
+
 이 폴더는 `01_learning_grading`부터 `08_attendance`까지 모든 기능이 공통으로 따라야 할 설계 원칙을 모아둔 공간이다.
 
-**문서 설계는 `53_design_completion_implementation_handoff.md`를 마지막으로 완료 상태**로 본다.
+구현 착수 기준은 `53_design_completion_implementation_handoff.md`, 모든 시나리오를 다시 검증하는 최신 표현 표준은 `54_user_centered_scenario_upgrade_standard.md`로 본다.
 
 새 요구사항이 생기지 않는 한 새 공통 문서를 계속 추가하지 않고, 구현 변화는 기존 문서를 갱신한다.
 
@@ -103,6 +105,7 @@
 - `51_migration_change_plan.md` : 설계 확정 후 migration 변경 순서
 - `52_mvp_backend_release_gate.md` : MVP 백엔드 최종 릴리즈 게이트
 - `53_design_completion_implementation_handoff.md` : **문서 설계 완료 선언, 남은 결정, 바로 코딩 가능한 범위, 3인 착수 순서**
+- `54_user_centered_scenario_upgrade_standard.md` : **전 시나리오 사용자 화면·Worst Case·감지·방어·UI·후속 영향·TBD 검증 표준**
 
 ---
 
