@@ -1,151 +1,93 @@
-# Scenario
+# 게임 시나리오 문서
 
-이 폴더는 백엔드 개발 전에 **사용자 흐름 → API 계약 → DB 변화 → 테스트**를 맞추기 위한 설계 문서 공간입니다.
+이 폴더의 목적은 **기능 목록을 나열하는 것**이 아니라, 사용자가 로그인한 뒤 실제로 게임을 이용하는 순서를 따라가면서 각 단계에서 무슨 일이 일어나고 어떤 변수가 발생할 수 있는지 이해할 수 있게 만드는 것이다.
 
-현재 요구사항 기준 문서 설계는 **완료 상태**이며, 구현 시작 전에는 먼저 다음 문서를 봅니다.
+## 전체 흐름
 
-```text
-00_common/53_design_completion_implementation_handoff.md
+현재 기준 사용자 흐름은 다음과 같다.
+
+```mermaid
+flowchart TD
+    LOGIN([로그인]) --> HOME[홈]
+    HOME --> DAILY[일일 미션]
+    HOME --> LEARN[학습]
+    HOME --> BATTLE[배틀]
+    HOME --> RANK[랭킹/승급전]
+    HOME --> SHOP[상점]
+    HOME --> GACHA[가챠]
+    HOME --> HOUSE[하우징]
+
+    DAILY --> D1[오늘의 복습 문제 확인] --> D2[문제 풀이 및 제출] --> D3[채점] --> D4[개별 및 올클리어 보상] --> MONEY((재화 획득))
+    LEARN --> L1[문제 선택] --> L2[코드 작성] --> L3[제출] --> L4[채점] --> L5[정답 보상] --> MONEY
+    BATTLE --> B1[방 참가] --> B2[Ready] --> B3[게임 시작] --> B4[문제 풀이] --> B5[점수 경쟁] --> B6[배틀 결과 보상] --> MONEY
+    RANK --> R1[랭킹 확인] --> R2[승급전 도전] --> R3[문제 풀이] --> R4{성공/실패}
+    R4 -->|성공| R5[승급 성공 보상] --> MONEY
+    R4 -->|실패| END[종료]
+    MONEY --> SHOP --> S1[가구 구매] --> HOUSE
+    MONEY --> GACHA --> G1[고양이 획득] --> HOUSE
+    HOUSE --> H1[가구 배치]
+    HOUSE --> H2[고양이 상호작용]
 ```
 
-이후에는 새 요구사항이 생기지 않는 한 설계 파일을 계속 늘리지 않고, 실제 구현 변화에 맞춰 기존 문서를 갱신합니다.
+> 사용자가 제공한 원본 흐름 이미지는 현재 이 채팅에서 확인했으나, GitHub 커넥터의 텍스트 파일 쓰기 경로로는 첨부 PNG 바이너리를 그대로 업로드할 수 없어 이번 커밋에는 동일 흐름을 Mermaid로 먼저 반영했다. 원본 PNG가 저장소 파일로 제공되면 `scenario/assets/full_flow.png`로 교체할 수 있다.
 
----
-
-## 최신 제품 흐름
+## 폴더 구조
 
 ```text
-로그인
-→ 그날 첫 로그인이라면 자동 출석 1회 + 100원
-→ 홈
-
-학습 / 배틀 / 승급전
-→ 결과/보상
-→ 재화
-→ 상점 / 가챠
-→ 가구 / 고양이
-→ 하우징
+scenario/
+├─ README.md
+├─ by_function/
+│  ├─ 00_common/
+│  ├─ 01_learning_grading/
+│  ├─ 02_gacha/
+│  ├─ 03_battle/
+│  ├─ 04_rank_challenge/
+│  ├─ 05_auth/
+│  ├─ 06_housing/
+│  ├─ 07_shop/
+│  ├─ 08_attendance/
+│  └─ README.md
+└─ by_flow/
+   ├─ 01_daily_mission/
+   ├─ 02_learning/
+   ├─ 03_battle/
+   ├─ 04_ranking_promotion/
+   ├─ 05_shop/
+   ├─ 06_gacha/
+   ├─ 07_housing/
+   └─ 08_currency/
 ```
 
-상세 상위 기준:
+## 두 문서 축의 역할
 
-- `00_common/13_latest_product_flow.md`
-- `00_common/10_cross_domain_data_flow.md`
+### `by_flow/` — 먼저 읽는 문서
 
-서비스 기준 timezone의 실제 값은 아직 팀 결정사항입니다.
+사용자가 실제로 게임을 사용하는 순서대로 읽는다. 각 단계는 다음 질문에 답해야 한다.
 
----
+1. 이 단계의 목적은 무엇인가?
+2. 정상적인 경우 사용자는 무엇을 하고 서버는 무엇을 하는가?
+3. 어떤 변수·예외·분기가 생길 수 있는가?
+4. 그 변수는 왜 생기는가?
+5. 시스템은 어떻게 감지하는가?
+6. 서버·DB는 어떻게 처리해야 하는가?
+7. 사용자에게 어떤 UI/메시지를 보여줘야 하는가?
+8. 재시도·중복 요청·동시성·네트워크 단절은 어떻게 처리하는가?
+9. 다음 단계로 넘어가는 조건은 무엇인가?
+10. 다음 단계에 어떤 영향을 주는가?
+11. 무엇을 테스트해야 하는가?
 
-## 폴더
+### `by_function/` — 상세 근거 문서
 
-| 폴더 | 영역 |
-| --- | --- |
-| `00_common/` | 공통 설계, 동시성, Docker, JWT, WebSocket, 구현 현황, migration, release gate, 최종 인수인계 |
-| `01_learning_grading/` | 학습·채점 |
-| `02_gacha/` | 가챠·고양이 |
-| `03_battle/` | 실시간 배틀 |
-| `04_rank_challenge/` | 랭킹·승급전 |
-| `05_auth/` | 인증·JWT |
-| `06_housing/` | 하우징 |
-| `07_shop/` | 상점 |
-| `08_attendance/` | 출석 |
+기존에 작성된 기능/API/DB 중심 시나리오를 **삭제하지 않고 그대로 보존**한 영역이다. `by_flow`를 읽다가 특정 API 계약, DB 상태, 동시성 정책, Docker 채점, 에러 규칙 등의 상세 근거가 필요할 때 참고한다.
 
----
+## 권장 읽기 순서
 
-# 공통 문서
+`scenario/README.md` → `by_flow`의 해당 사용자 흐름 → 필요할 때 `by_function`의 기능별 상세 문서 순서로 읽는다.
 
-`00_common/README.md`에서 **01~53 공통 문서**를 주제별로 찾을 수 있습니다.
+## 작성 원칙
 
-```text
-01~12  기본 설계
-13~17  전체 흐름/실행 계획
-18~22  API/상태/프론트/재화
-23~27  DB 책임/권한/transaction
-28~32  시간/중복/로그/설정/seed
-33~37  API 운영/validation/복구
-38~42  WebSocket/보상/JWT/관리자
-43~47  이벤트/BackgroundTask/보안/성능/E2E
-48~53  현재 코드 감사/schema gap/migration/release/handoff
-```
-
-구현 시작 전 핵심 문서:
-
-- `00_common/53_design_completion_implementation_handoff.md` : **설계 종료와 실제 구현 착수 기준**
-- `00_common/25_unresolved_blocker_priority.md` : 실제로 팀이 결정해야 하는 P0/P1/P2
-- `00_common/48_current_backend_implementation_status.md` : 현재 main 코드 상태
-- `00_common/49_schema_gap_register.md` : 19테이블로 부족한 지점
-- `00_common/50_api_implementation_gap_matrix.md` : API별 DONE/PARTIAL/MISSING/POLICY
-- `00_common/51_migration_change_plan.md` : migration 순서
-- `00_common/52_mvp_backend_release_gate.md` : 최종 MVP 완료 기준
-
----
-
-# 도메인별 문서 세트
-
-각 영역은 다음 순서로 읽습니다.
-
-```text
-README
-→ 상세 시나리오
-→ API_SPEC_DRAFT.md
-→ DB_BEFORE_AFTER.md
-→ TEST_CASES.md
-```
-
-| 영역 | 상세 시나리오 | API 명세 | DB 변화 | 테스트 |
-| --- | --- | --- | --- | --- |
-| A 학습·채점 | `01_learning_grading/A-01_task_detail_view.md`, `01_learning_grading/A-02_to_A-10_detailed.md` | `01_learning_grading/API_SPEC_DRAFT.md` | `01_learning_grading/DB_BEFORE_AFTER.md` | `01_learning_grading/TEST_CASES.md` |
-| B 가챠 | `02_gacha/B-01_to_B-10_detailed.md` | `02_gacha/API_SPEC_DRAFT.md` | `02_gacha/DB_BEFORE_AFTER.md` | `02_gacha/TEST_CASES.md` |
-| C 배틀 | `03_battle/C-01_to_C-10_detailed.md` | `03_battle/API_SPEC_DRAFT.md` | `03_battle/DB_BEFORE_AFTER.md` | `03_battle/TEST_CASES.md` |
-| D 승급전 | `04_rank_challenge/D-01_to_D-10_detailed.md` | `04_rank_challenge/API_SPEC_DRAFT.md` | `04_rank_challenge/DB_BEFORE_AFTER.md` | `04_rank_challenge/TEST_CASES.md` |
-| E 인증 | `05_auth/E-01_to_E-10_detailed.md` | `05_auth/API_SPEC_DRAFT.md` | `05_auth/DB_BEFORE_AFTER.md` | `05_auth/TEST_CASES.md` |
-| F 하우징 | `06_housing/F-01_to_F-10_detailed.md` | `06_housing/API_SPEC_DRAFT.md` | `06_housing/DB_BEFORE_AFTER.md` | `06_housing/TEST_CASES.md` |
-| G 상점 | `07_shop/G-01_to_G-10_detailed.md` | `07_shop/API_SPEC_DRAFT.md` | `07_shop/DB_BEFORE_AFTER.md` | `07_shop/TEST_CASES.md` |
-| H 출석 | `08_attendance/H-01_to_H-10_detailed.md` | `08_attendance/API_SPEC_DRAFT.md` | `08_attendance/DB_BEFORE_AFTER.md` | `08_attendance/TEST_CASES.md` |
-
----
-
-## 문서별 역할
-
-**README**는 해당 도메인의 현재 구현 상태와 문서 읽는 순서를 빠르게 보여줍니다.
-
-**상세 시나리오**는 사용자가 화면에서 무엇을 하고 어떤 예외가 생기는지 설명합니다.
-
-**API_SPEC_DRAFT.md**는 endpoint, Request/Response, 상태코드, 현재 구현과 미구현을 구분합니다.
-
-**DB_BEFORE_AFTER.md**는 API 실행 전 DB와 성공/실패/rollback 후 DB를 비교합니다.
-
-**TEST_CASES.md**는 실제 검증 항목을 `NOW / AFTER / POLICY`로 구분합니다.
-
----
-
-# 현재 확정된 핵심 기준
-
-- 출석: **매일 자정 이후 첫 로그인 자동 처리 + 100원 지급**
-- Docker: **memory 128MB / CPU 0.5 / network none / read-only**
-- 코드 제출: **PENDING 저장 후 202 Accepted, 긴 채점은 요청 밖에서 처리**
-- 단순 재화 차감: **Atomic conditional UPDATE**
-- 여러 상태의 일관성 검사: 필요한 구간 **SELECT ... FOR UPDATE**
-- 하루 한 번 등 유일성 규칙: **DB UNIQUE**
-- 실시간 상태: **DB commit 후 WebSocket**, DB가 최종 기준
-- 인증 최종 방향: **JWT/current_user 기반**
-- 가격·확률·점수·제한시간 등 미정 정책은 임의로 확정하지 않음
-
----
-
-# 이제부터의 작업 방식
-
-문서 설계는 끝났으므로 다음 순서로 진행합니다.
-
-```text
-필요한 P0 비즈니스 결정
-→ 구현
-→ TEST_CASES 기준 검증
-→ 48/50 및 해당 도메인 문서 상태 갱신
-→ E2E
-→ 52 release gate
-```
-
-새 요구사항이 생기면 관련 기존 문서를 먼저 수정합니다.
-
-**현재 요구사항 기준으로 추가 설계 문서를 더 만드는 단계는 종료되었습니다.**
+- 아직 팀에서 확정하지 않은 비즈니스 수치는 임의로 확정하지 않는다. 가챠 비용·확률·천장, 승급 합격 기준, 보상 액수, 재화 체계 등이 미정이면 `TBD`로 표시한다.
+- 프론트 버튼 비활성화만으로 정합성을 보장하지 않는다. 재화 차감, 중복 보상, 방 정원, 보상 지급 등은 서버/DB에서 다시 검증한다.
+- Docker 채점처럼 오래 걸리는 외부 작업 동안 DB 트랜잭션/row lock을 유지하지 않는다.
+- 같은 요청이 재전송될 수 있다는 전제로 중복 제출·중복 지급·중복 구매를 검토한다.
+- 정상 흐름뿐 아니라 실패 후 복구 흐름까지 반드시 적는다.
