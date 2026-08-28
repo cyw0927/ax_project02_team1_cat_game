@@ -1,6 +1,6 @@
 # 플레이어블 프로토타입
 
-최신 실행 경로는 `index.html` → `game.html`인 단일 앱입니다. 과거 `playable_mockup_v1~v14.html`과 `house_motion_mockup*`은 비교용 legacy로 보존하지만 최신 앱에서는 iframe으로 불러오지 않습니다.
+최신 실행 경로는 `index.html` → `game.html`인 단일 앱입니다. iframe 기반 구형 목업은 최신 앱으로 이관을 마쳐 제거했습니다.
 
 ## 실행
 
