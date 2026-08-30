@@ -10,7 +10,7 @@
 
 현재 작업 브랜치: `feature/db-schema`
 
-현재 재개 지점: **4-1. Concept 초기 데이터 작성**
+현재 재개 지점: **5-4. 채점용 Docker 이미지 작성**
 
 > 기존 저장소에는 뒤 단계의 API와 기본 로직이 일부 존재한다. 그러나 이 로드맵에서는 실제 코드, ORM, API 명세, 테스트가 함께 검증되기 전까지 완료로 표시하지 않는다.
 
@@ -22,7 +22,8 @@
 | 1 | DB 구현 | 완료 |
 | 2 | FastAPI 공통 기반 | 완료 |
 | 3 | 사용자 및 출석 | 완료 |
-| 4~15 | 나머지 기능 및 배포 | 재검증 필요 |
+| 4 | 학습 문제 조회 | 완료 |
+| 5~15 | 나머지 기능 및 배포 | 재검증 필요 |
 
 ---
 
@@ -157,30 +158,105 @@
 
 # 4. 학습 문제 조회 기능 구현
 
-- [ ] 4-1. Concept 초기 데이터 작성
-- [ ] 4-2. Task 초기 문제 데이터 작성
-- [ ] 4-3. 개념 목록 조회 API 작성
-- [ ] 4-4. 개념별 문제 목록 조회 API 작성
-- [ ] 4-5. 문제 상세 조회 API 작성
-- [ ] 4-6. 비활성 문제 제외 처리
-- [ ] 4-7. 난이도별 잠금 조건 구현
-- [ ] 4-8. 힌트 조회 및 사용 처리
-- [ ] 4-9. 테스트 케이스 비공개 처리
-- [ ] 4-10. Backend API 명세 작성
-- [ ] 4-11. Frontend 사용 명세 작성
+- [x] 4-1. Concept 초기 데이터 작성
+  - [x] 고정 ID 1~5와 개념명 정의
+  - [x] Concept 전용 seed 함수 분리
+  - [x] 최초 실행 5개 생성 및 재실행 0개 생성 테스트
+  - [x] 개발 DB seed 2회 실행 및 기존 데이터 유지 확인
+- [x] 4-2. Task 초기 문제 데이터 작성
+  - [x] 5개 초기 문제의 고정 UUID와 Concept FK 정의
+  - [x] 문제 유형 `CODE`, 난이도 `BASIC`, 활성 상태 검증
+  - [x] 각 문제의 비공개 테스트 케이스 JSON 3개 검증
+  - [x] Task 전용 멱등 seed 함수와 재실행 테스트
+  - [x] 개발 DB seed 2회 실행 및 5개 기존 문제 유지 확인
+- [x] 4-3. 개념 목록 조회 API 작성
+  - [x] `ConceptResponse` 공통 스키마
+  - [x] `GET /concepts` ID 오름차순 조회
+  - [x] 현재 사용자 및 `USER`·`ADMIN` 역할 guard
+  - [x] 빈 목록 `200 []` 정책
+  - [x] 성공·인증·권한·빈 목록 API 테스트
+  - [x] Backend·Frontend 공동 명세
+- [x] 4-4. 개념별 문제 목록 조회 API 작성
+  - [x] `TaskSummaryResponse` 목록 전용 공개 스키마
+  - [x] `GET /concepts/{concept_id}/tasks`
+  - [x] Concept 존재 확인 및 `CONCEPT_NOT_FOUND` 공통 오류
+  - [x] 활성 문제만 Task ID 오름차순 조회
+  - [x] 상세·템플릿·힌트·테스트 케이스 비공개
+  - [x] 빈 목록과 정상 목록 API 테스트
+  - [x] Backend·Frontend 공동 명세
+- [x] 4-5. 문제 상세 조회 API 작성
+  - [x] `TaskDetailResponse` 상세 전용 공개 스키마
+  - [x] `GET /tasks/{task_id}`
+  - [x] 활성 문제만 조회하고 `TASK_NOT_FOUND` 공통 오류
+  - [x] 설명·코드 템플릿 공개
+  - [x] 힌트·테스트 케이스 비공개
+  - [x] 정상 상세 및 404 API 테스트
+  - [x] Backend·Frontend 공동 명세
+- [x] 4-6. 비활성 문제 제외 처리
+  - [x] 개념별 목록 `is_active = true` 필터
+  - [x] 상세 직접 접근 시 비활성 문제 `404`
+  - [x] 일일 미션 문제 선정 활성 필터
+  - [x] 호환용 `GET /tasks` 인증·활성 필터·정렬·응답 스키마
+  - [x] 호환 endpoint deprecated 표시
+  - [x] 모든 조회 경로 필터 회귀 테스트와 공동 명세
+- [x] 4-7. 난이도별 잠금 조건 구현
+  - [x] 기획 문서의 난이도·숙련도 임계값 `TBD` 확인
+  - [x] 미확정 기준으로 접근을 차단하지 않는 MVP 정책
+  - [x] 목록·상세·호환 응답에 `is_locked: false` 계약
+  - [x] Frontend 자체 잠금 계산 금지 명세
+  - [x] `USER`·`ADMIN` 동일 정책과 응답 회귀 테스트
+- [x] 4-8. 힌트 조회 및 사용 처리
+  - [x] `TaskHintResponse` 공개 스키마
+  - [x] `POST /tasks/{task_id}/hint`
+  - [x] 현재 사용자와 역할 및 활성 문제 검사
+  - [x] `TASK_NOT_FOUND`·`HINT_NOT_AVAILABLE` 오류 분리
+  - [x] `used_hint: true` 제출 연결 계약
+  - [x] 힌트 보상 영향 `TBD` 유지
+  - [x] 정상·힌트 없음·문제 없음 API 테스트와 공동 명세
+  - [x] 서버 권위 힌트 기록 강화는 제출 단계로 이관
+- [x] 4-9. 테스트 케이스 비공개 처리
+  - [x] 모든 사용자용 Task 응답 스키마에서 `test_cases` 제외
+  - [x] 목록·상세·호환·힌트 실제 JSON 비공개 검증
+  - [x] OpenAPI response schema 우회 노출 회귀 테스트
+  - [x] 채점 작업만 DB 원본을 읽는 경계 명세
+- [x] 4-10. Backend API 명세 작성
+  - [x] 개념·문제 목록·상세·힌트·활성 필터·잠금 정책
+  - [x] 공통 인증·권한·오류 응답 계약
+- [x] 4-11. Frontend 사용 명세 작성
+  - [x] 화면별 API 사용과 빈 상태·오류 처리
+  - [x] 잠금 권위 값과 비공개 필드 처리 원칙
 
 # 5. 코드 제출 및 채점 기능 구현
 
-- [ ] 5-1. 코드 제출 요청 스키마 작성
-- [ ] 5-2. TaskAttempt 생성 API 작성
-- [ ] 5-3. 제출 상태를 `PENDING`으로 저장
+- [x] 5-1. 코드 제출 요청 스키마 작성
+  - [x] Body `user_id` 제거 및 예상하지 않은 필드 차단
+  - [x] 공백 코드 검증과 코드 크기 `TBD` 유지
+  - [x] 4개 context와 연결 ID 조합 검증
+- [x] 5-2. TaskAttempt 생성 API 작성
+  - [x] 현재 사용자 및 활성 Task 검사
+  - [x] DAILY·BATTLE·RANKING context 소유권과 문제 연결 검사
+  - [x] 공통 응답·오류 스키마와 transaction rollback
+- [x] 5-3. 제출 상태를 `PENDING`으로 저장
+  - [x] 제출 코드·context·힌트 상태 저장
+  - [x] 채점 전 `is_correct = null`
+  - [x] `202 Accepted` 응답과 API 테스트
 - [ ] 5-4. 채점용 Docker 이미지 작성
-- [ ] 5-5. Docker 네트워크 차단
-- [ ] 5-6. Docker 메모리 제한 적용
-- [ ] 5-7. Docker CPU 제한 적용
-- [ ] 5-8. 실행 시간 제한 적용
-- [ ] 5-9. 읽기 전용 파일 시스템 적용
-- [ ] 5-10. 동시 채점 개수 제한
+  - [x] Python 3.12 slim 기반 최소 이미지
+  - [x] 비-root `sandbox` 사용자 및 애플리케이션 코드 미포함
+  - [x] 격리 Python 기본 실행 계약과 정적 테스트
+  - [ ] 로컬 Docker build 및 컨테이너 실행 확인(Docker CLI 없음)
+- [x] 5-5. Docker 네트워크 차단
+  - [x] `network_disabled=True` 전달 테스트
+- [x] 5-6. Docker 메모리 제한 적용
+  - [x] `mem_limit` 전달 테스트
+- [x] 5-7. Docker CPU 제한 적용
+  - [x] CPU 값을 `nano_cpus`로 변환하는 테스트
+- [x] 5-8. 실행 시간 제한 적용
+  - [x] deadline 초과 시 컨테이너 kill 및 timeout 결과 테스트
+- [x] 5-9. 읽기 전용 파일 시스템 적용
+  - [x] read-only, capability 제거, privilege 상승 차단
+- [x] 5-10. 동시 채점 개수 제한
+  - [x] 프로세스 내 `BoundedSemaphore` 최대 3개 테스트
 - [ ] 5-11. 테스트 케이스 실행
 - [ ] 5-12. 정답·오답 판정
 - [ ] 5-13. 채점 상태 및 결과 DB 저장
@@ -363,11 +439,11 @@
 
 # 다음 작업
 
-`4-1. Concept 초기 데이터 작성`부터 재개한다.
+`5-4. 채점용 Docker 이미지 build 검증`부터 재개한다.
 
 구현 전에 다음 항목을 먼저 확인한다.
 
-- Concept seed의 멱등성과 고정 ID
-- 초기 migration 이후 seed 재실행 결과
-- 기존 Concept 조회 router의 ORM 및 응답 스키마
-- Concept seed와 초기 Task seed의 참조 무결성
+- Docker Desktop 설치 또는 Docker CLI 사용 가능한 환경
+- `cat-game-sandbox:local` 이미지 build
+- 비-root 사용자와 격리 Python의 실제 컨테이너 실행 확인
+- 완료 후 `5-11. 테스트 케이스 실행` 구현

@@ -78,3 +78,16 @@ ERD는 프로젝트 조건에 맞춰 20개 미만의 테이블로 구성했습�
 > 테이블 기준이나 화면 기준으로 무조건 나눈 것이 아니라, **같은 이유로 함께 변경되는 기능을 하나의 도메인으로 묶는 것**을 기준으로 했습니다.
 
 이 구조를 사용하면 각 팀원이 기능별로 작업 범위를 나누기 쉽고, 학습/채점 같은 핵심 기능과 하우징·고양이 같은 부가 기능이 서로 과도하게 얽히는 것을 줄일 수 있습니다.
+
+## 채점 Sandbox 이미지
+
+채점 전용 이미지는 `sandbox/Dockerfile`에서 빌드합니다.
+
+```powershell
+docker build -t cat-game-sandbox:local -f sandbox/Dockerfile sandbox
+docker run --rm --network none --read-only cat-game-sandbox:local
+```
+
+이미지는 Python 3.12 slim과 비-root `sandbox` 사용자만 포함하며 서버 소스와
+추가 패키지를 복사하지 않습니다. 실제 제출 실행 시에는 Backend executor가
+네트워크·메모리·CPU·시간·읽기 전용·capability 제한을 추가로 적용합니다.

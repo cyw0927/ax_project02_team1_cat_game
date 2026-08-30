@@ -11,6 +11,13 @@ from app.users.models import User
 
 
 DEV_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+CONCEPT_SEEDS = (
+    (1, "변수와 자료형"),
+    (2, "조건문"),
+    (3, "반복문"),
+    (4, "함수"),
+    (5, "리스트"),
+)
 TASK_IDS = {
     "double_number": uuid.UUID(
         "10000000-0000-0000-0000-000000000001"
@@ -28,32 +35,57 @@ TASK_IDS = {
         "10000000-0000-0000-0000-000000000005"
     ),
 }
+TASK_CONCEPT_IDS = {
+    "double_number": 1,
+    "is_even": 2,
+    "sum_to_n": 3,
+    "multiply": 4,
+    "find_max": 5,
+}
+TASK_TYPE_CODE = "CODE"
+TASK_DIFFICULTY_BASIC = "BASIC"
+
+
+def seed_concepts(db) -> int:
+    """고정 ID의 기본 학습 개념을 멱등하게 생성한다."""
+
+    created_count = 0
+
+    for concept_id, name in CONCEPT_SEEDS:
+        if db.get(Concept, concept_id) is None:
+            db.add(Concept(id=concept_id, name=name))
+            created_count += 1
+
+    return created_count
+
+
+def seed_tasks(db, tasks: list[Task]) -> int:
+    """고정 UUID의 기본 문제를 멱등하게 생성한다."""
+
+    created_count = 0
+
+    for task in tasks:
+        if db.get(Task, task.id) is None:
+            db.add(task)
+            created_count += 1
+
+    return created_count
+
 
 def seed_master_data() -> None:
     db = SessionLocal()
     created_count = 0
 
     try:
-        concepts = [
-            Concept(id=1, name="변수와 자료형"),
-            Concept(id=2, name="조건문"),
-            Concept(id=3, name="반복문"),
-            Concept(id=4, name="함수"),
-            Concept(id=5, name="리스트"),
-        ]
-
-        for concept in concepts:
-            if db.get(Concept, concept.id) is None:
-                db.add(concept)
-                created_count += 1
+        created_count += seed_concepts(db)
 
         tasks = [
             Task(
                 id=TASK_IDS["double_number"],
-                concept_id=1,
+                concept_id=TASK_CONCEPT_IDS["double_number"],
                 title="숫자를 두 배로 만들기",
-                type="CODE",
-                difficulty="BASIC",
+                type=TASK_TYPE_CODE,
+                difficulty=TASK_DIFFICULTY_BASIC,
                 description=(
                     "숫자 하나를 받아 두 배로 반환하는 "
                     "double_number 함수를 작성하세요."
@@ -79,10 +111,10 @@ def seed_master_data() -> None:
             ),
             Task(
                 id=TASK_IDS["is_even"],
-                concept_id=2,
+                concept_id=TASK_CONCEPT_IDS["is_even"],
                 title="짝수 판별하기",
-                type="CODE",
-                difficulty="BASIC",
+                type=TASK_TYPE_CODE,
+                difficulty=TASK_DIFFICULTY_BASIC,
                 description=(
                     "정수를 받아 짝수이면 True, 홀수이면 False를 "
                     "반환하는 is_even 함수를 작성하세요."
@@ -108,10 +140,10 @@ def seed_master_data() -> None:
             ),
             Task(
                 id=TASK_IDS["sum_to_n"],
-                concept_id=3,
+                concept_id=TASK_CONCEPT_IDS["sum_to_n"],
                 title="1부터 N까지 더하기",
-                type="CODE",
-                difficulty="BASIC",
+                type=TASK_TYPE_CODE,
+                difficulty=TASK_DIFFICULTY_BASIC,
                 description=(
                     "양의 정수 n을 받아 1부터 n까지의 합을 반환하는 "
                     "sum_to_n 함수를 반복문으로 작성하세요."
@@ -137,10 +169,10 @@ def seed_master_data() -> None:
             ),
             Task(
                 id=TASK_IDS["multiply"],
-                concept_id=4,
+                concept_id=TASK_CONCEPT_IDS["multiply"],
                 title="두 수를 곱하는 함수",
-                type="CODE",
-                difficulty="BASIC",
+                type=TASK_TYPE_CODE,
+                difficulty=TASK_DIFFICULTY_BASIC,
                 description=(
                     "두 수 a와 b를 받아 곱한 값을 반환하는 "
                     "multiply 함수를 작성하세요."
@@ -166,10 +198,10 @@ def seed_master_data() -> None:
             ),
             Task(
                 id=TASK_IDS["find_max"],
-                concept_id=5,
+                concept_id=TASK_CONCEPT_IDS["find_max"],
                 title="리스트에서 최댓값 찾기",
-                type="CODE",
-                difficulty="BASIC",
+                type=TASK_TYPE_CODE,
+                difficulty=TASK_DIFFICULTY_BASIC,
                 description=(
                     "숫자 리스트를 받아 가장 큰 값을 반환하는 "
                     "find_max 함수를 작성하세요."
@@ -207,10 +239,7 @@ def seed_master_data() -> None:
             ),
         ]
 
-        for task in tasks:
-            if db.get(Task, task.id) is None:
-                db.add(task)
-                created_count += 1
+        created_count += seed_tasks(db, tasks)
 
         items = [
             Item(

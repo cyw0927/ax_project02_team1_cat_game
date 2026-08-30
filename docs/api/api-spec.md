@@ -1170,19 +1170,368 @@ GET /users/{user_id}
 ## 9. 학습 문제 API
 
 ```text
-상태: 작성 예정
+상태: 진행 중
 ```
 
-포함할 API:
+완료된 API:
 
-- 개념 목록 조회
-- 개념별 문제 목록 조회
-- 문제 상세 조회
-- 힌트 조회 및 사용
-- 코드 제출
+- `GET /concepts` 개념 목록 조회
+- `GET /concepts/{concept_id}/tasks` 개념별 활성 문제 목록 조회
+- `GET /tasks/{task_id}` 활성 문제 상세 조회
+- `POST /tasks/{task_id}/hint` 힌트 조회 및 사용
+- `POST /attempts` 코드 제출 접수
+- `GET /tasks` 전체 활성 문제 목록 조회(호환용, deprecated)
+
+작성 예정 API:
+
 - 채점 결과 조회
 - 학습 이력 조회
 - 취약 개념 추천
+
+### `GET /concepts`
+
+#### 기능
+
+학습 문제를 분류하는 전체 개념 목록을 고정 ID 오름차순으로 조회한다.
+조회 결과가 없으면 오류 대신 빈 배열을 반환한다.
+
+#### 인증 및 권한
+
+- 현재 식별 방식: 개발·테스트 환경의 `X-User-ID`
+- 허용 역할: `USER`, `ADMIN`
+
+#### HTTP 요청
+
+```http
+GET /concepts
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+#### 성공 응답
+
+- 상태 코드: `200 OK`
+
+```json
+[
+  {
+    "id": 1,
+    "name": "변수와 자료형"
+  },
+  {
+    "id": 2,
+    "name": "조건문"
+  }
+]
+```
+
+#### 응답 필드
+
+- `id`: Concept 고정 정수 ID
+- `name`: 화면에 표시할 개념명
+
+#### Backend 처리
+
+- `Concept.id` 오름차순으로 정렬한다.
+- 목록 조회만 수행하며 DB 데이터를 변경하지 않는다.
+- 공통 `ConceptResponse` 스키마로 응답을 검증한다.
+- 데이터가 없으면 `200 OK`와 `[]`를 반환한다.
+
+#### Frontend 처리
+
+- 응답 순서를 기본 표시 순서로 사용한다.
+- 개념 ID나 이름을 Frontend에 별도로 하드코딩하지 않는다.
+- 빈 배열이면 오류 화면 대신 학습 개념이 준비되지 않았다는 빈 상태를 표시한다.
+- `401`이면 현재 사용자 식별 또는 로그인 상태를 복구한다.
+- `403`이면 접근 권한이 없음을 표시한다.
+
+#### 오류 응답
+
+- `401 Unauthorized`: 현재 사용자 식별 실패
+- `403 Forbidden`: 허용되지 않은 역할
+
+### `GET /concepts/{concept_id}/tasks`
+
+#### 기능
+
+특정 개념에 속한 활성 문제의 목록용 요약 정보를 조회한다.
+
+#### 인증 및 권한
+
+- 현재 식별 방식: 개발·테스트 환경의 `X-User-ID`
+- 허용 역할: `USER`, `ADMIN`
+
+#### HTTP 요청
+
+```http
+GET /concepts/1/tasks
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+#### 성공 응답
+
+- 상태 코드: `200 OK`
+
+```json
+[
+  {
+    "id": "10000000-0000-0000-0000-000000000001",
+    "concept_id": 1,
+    "title": "숫자를 두 배로 만들기",
+    "type": "CODE",
+    "difficulty": "BASIC",
+    "is_locked": false
+  }
+]
+```
+
+#### Backend 처리
+
+- 먼저 `concept_id`에 해당하는 Concept의 존재를 확인한다.
+- `Task.concept_id`가 일치하고 `is_active = true`인 문제만 반환한다.
+- 결과는 `Task.id` 오름차순으로 고정한다.
+- 문제는 없지만 Concept이 존재하면 `200 OK`와 `[]`를 반환한다.
+- 목록 응답에는 `description`, `template_code`, `hint_text`, `test_cases`를 포함하지 않는다.
+
+#### Frontend 처리
+
+- 목록 카드에는 `title`, `type`, `difficulty`만 사용한다.
+- `is_locked`가 `true`일 때만 문제 선택을 차단한다.
+- 상세 코드와 힌트는 문제 상세·힌트 API에서 별도로 조회한다.
+- 빈 배열이면 해당 개념에 준비된 문제가 없다는 빈 상태를 표시한다.
+- `404 CONCEPT_NOT_FOUND`이면 개념 목록을 다시 조회하거나 이전 화면으로 이동한다.
+- 잠금 여부는 항상 Backend 응답의 `is_locked` 값을 사용한다.
+
+#### 오류 응답
+
+- `401 Unauthorized`: 현재 사용자 식별 실패
+- `403 Forbidden`: 허용되지 않은 역할
+- `404 Not Found`
+  - 오류 코드: `CONCEPT_NOT_FOUND`
+  - 발생 조건: 요청한 Concept ID가 존재하지 않음
+
+### `GET /tasks/{task_id}`
+
+#### 기능
+
+코드 작성 화면에 필요한 활성 문제의 상세 내용과 시작 템플릿을 조회한다.
+
+#### 인증 및 권한
+
+- 현재 식별 방식: 개발·테스트 환경의 `X-User-ID`
+- 허용 역할: `USER`, `ADMIN`
+
+#### HTTP 요청
+
+```http
+GET /tasks/10000000-0000-0000-0000-000000000001
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+#### 성공 응답
+
+```json
+{
+  "id": "10000000-0000-0000-0000-000000000001",
+  "concept_id": 1,
+  "title": "숫자를 두 배로 만들기",
+  "type": "CODE",
+  "difficulty": "BASIC",
+  "is_locked": false,
+  "description": "숫자 하나를 받아 두 배로 반환하는 double_number 함수를 작성하세요.",
+  "template_code": "def double_number(number):\n    # 코드를 작성하세요.\n    pass\n"
+}
+```
+
+#### Backend 처리
+
+- `task_id`가 일치하고 `is_active = true`인 문제만 조회한다.
+- 비활성 문제와 존재하지 않는 문제를 구분해 노출하지 않고 모두 `404 TASK_NOT_FOUND`로 처리한다.
+- 응답은 `TaskDetailResponse`로 제한한다.
+- 채점 정답이 포함된 `test_cases`는 절대 반환하지 않는다.
+- `hint_text`는 힌트 사용 기록과 연결할 별도 API에서만 반환한다.
+
+#### Frontend 처리
+
+- `description`을 문제 설명으로 표시한다.
+- `template_code`를 코드 편집기의 최초 값으로 사용한다.
+- 문제 정답 데이터나 힌트를 상세 응답에서 추측하지 않는다.
+- `404 TASK_NOT_FOUND`이면 목록을 다시 조회하고 문제를 열 수 없다고 안내한다.
+
+#### 오류 응답
+
+- `401 Unauthorized`: 현재 사용자 식별 실패
+- `403 Forbidden`: 허용되지 않은 역할
+- `404 Not Found`
+  - 오류 코드: `TASK_NOT_FOUND`
+  - 발생 조건: 문제 없음 또는 비활성 문제
+
+### `POST /tasks/{task_id}/hint`
+
+#### 기능
+
+사용자가 힌트 버튼을 눌렀을 때 활성 문제의 힌트를 반환하고, 이후 제출에서
+사용할 `used_hint: true` 상태를 함께 전달한다.
+
+#### HTTP 요청
+
+```http
+POST /tasks/10000000-0000-0000-0000-000000000001/hint
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+#### 성공 응답
+
+```json
+{
+  "task_id": "10000000-0000-0000-0000-000000000001",
+  "hint_text": "입력받은 number에 2를 곱해 보세요.",
+  "used_hint": true
+}
+```
+
+#### Backend 처리
+
+- 현재 사용자와 `USER`·`ADMIN` 역할을 확인한다.
+- 문제 ID와 `is_active = true` 조건을 함께 검사한다.
+- 활성 문제가 없으면 `404 TASK_NOT_FOUND`를 반환한다.
+- `hint_text`가 `null`이면 `404 HINT_NOT_AVAILABLE`을 반환한다.
+- 힌트 사용에 따른 보상·숙련도 감액은 정책이 확정되지 않았으므로 적용하지 않는다.
+
+#### Frontend 처리
+
+- 힌트 버튼을 누른 뒤 성공 응답의 `hint_text`를 표시한다.
+- 해당 코드 제출 상태에 `used_hint: true`를 유지한다.
+- 같은 문제를 다시 열거나 제출 상태를 초기화할 때 힌트 상태를 임의로 다른 문제에 재사용하지 않는다.
+- `HINT_NOT_AVAILABLE`이면 힌트가 준비되지 않았다는 안내를 표시한다.
+
+#### 현재 MVP 한계와 후속 연결
+
+현재 19개 테이블 ERD에는 제출 전 힌트 열람 이벤트를 별도로 저장하는 테이블이
+없다. 따라서 4단계에서는 API 응답과 제출 요청의 `used_hint`를 연결하고,
+`TASK_ATTEMPTS.used_hint` 저장은 코드 제출 단계에서 처리한다. 힌트 상태가
+보상에 영향을 주기 전, 5단계 제출 흐름에서 사용자가 `false`로 바꾸어 보내는
+경우를 막을 서버 권위 기록 방식을 함께 확정해야 한다.
+
+#### 오류 응답
+
+- `401 Unauthorized`: 현재 사용자 식별 실패
+- `403 Forbidden`: 허용되지 않은 역할
+- `404 TASK_NOT_FOUND`: 문제 없음 또는 비활성 문제
+- `404 HINT_NOT_AVAILABLE`: 활성 문제에 힌트가 없음
+
+### 비활성 문제 제외 정책
+
+`TASKS.is_active = false`인 문제는 다음 모든 사용자 흐름에서 제외한다.
+
+- `GET /concepts/{concept_id}/tasks` 개념별 목록
+- `GET /tasks/{task_id}` 문제 상세 직접 접근
+- `GET /tasks` 기존 전체 목록
+- 출석 생성 시 `daily_task_ids` 일일 미션 문제 선정
+- 코드 제출 시 활성 문제 재검증(제출 단계에서 최종 연결)
+
+비활성 문제 ID를 상세 주소로 직접 요청해도 존재 여부를 별도로 노출하지 않고
+`404 TASK_NOT_FOUND`를 반환한다.
+
+기존 `GET /tasks`는 호환을 위해 유지하지만 OpenAPI에서 deprecated로 표시한다.
+신규 Frontend는 `GET /concepts/{concept_id}/tasks`와
+`GET /tasks/{task_id}`를 사용한다. 호환 응답에도 `test_cases`, `hint_text` 및
+`description`은 포함하지 않는다.
+
+### 난이도 잠금 정책
+
+현재 기획에는 난이도 단계별 숙련도 임계값이 확정돼 있지 않다. 확정되지 않은
+기준으로 사용자의 문제 접근을 차단하지 않는다는 원칙에 따라, 현재 활성 문제는
+난이도와 관계없이 선택할 수 있고 모든 문제 응답은 `is_locked: false`를 반환한다.
+
+- Frontend는 난이도 문자열을 보고 자체적으로 잠금 여부를 계산하지 않는다.
+- Backend 응답의 `is_locked`만 잠금 UI의 권위 값으로 사용한다.
+- `USER`와 `ADMIN` 모두 현재는 같은 무잠금 정책을 적용한다.
+- 향후 난이도 값, 숙련도 임계값과 관리자 우회 정책이 확정되면 Backend 계산을
+  추가하되 응답 필드 계약은 유지한다.
+- 비활성 문제의 `404` 정책은 난이도 잠금과 별개로 계속 적용한다.
+
+### 테스트 케이스 비공개 정책
+
+`TASKS.test_cases`는 채점 서버 전용 데이터다. 다음 사용자용 응답 스키마와
+OpenAPI 계약에는 이 필드를 포함하지 않는다.
+
+- `TaskSummaryResponse`
+- `TaskDetailResponse`
+- `TaskCatalogResponse`
+- `TaskHintResponse`
+
+목록, 상세, 호환 목록, 힌트 및 오류 응답을 통해 우회 노출하지 않는다.
+Frontend는 테스트 케이스를 요청하거나 정답 판정에 사용하지 않는다. 코드 제출
+후 채점 작업만 DB에서 `test_cases`를 읽고, 사용자에게는 실행 결과 요약만
+반환한다. 이 경계는 OpenAPI schema 회귀 테스트로 고정한다.
+
+### `POST /attempts`
+
+#### 기능
+
+현재 사용자의 코드를 풀이 context와 함께 저장하고 비동기 채점 대기 상태를
+반환한다. HTTP 요청 안에서 Docker 채점을 실행하지 않는다.
+
+#### 요청 예시
+
+```json
+{
+  "task_id": "10000000-0000-0000-0000-000000000001",
+  "context_type": "LEARNING",
+  "submitted_code": "def double_number(number):\n    return number * 2",
+  "used_hint": false
+}
+```
+
+Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-User-ID`로
+식별된 현재 사용자를 사용하며, 예상하지 않은 Body 필드는 `422`로 거절한다.
+
+#### context별 연결 규칙
+
+- `LEARNING`: 연결 ID를 모두 `null`로 둔다.
+- `DAILY`: 본인 출석의 `attendance_id`가 필요하고 해당 문제는 `daily_task_ids`에 배정돼 있어야 한다.
+- `BATTLE`: 본인이 참가한 방의 해당 `room_task_id`가 필요하다.
+- `RANKING`: 본인 승급전의 해당 `rank_challenge_task_id`가 필요하다.
+
+다른 context의 연결 ID를 함께 보내거나 필수 ID를 생략하면 `422`다. 올바른
+형식이지만 본인 소유·참가 context가 아니거나 문제 연결이 다르면
+`404 ATTEMPT_CONTEXT_NOT_FOUND`를 반환한다.
+
+#### 입력 검증
+
+- `submitted_code`의 빈 문자열과 공백만 있는 문자열을 거절한다.
+- 코드 최대 크기는 기획에서 `TBD`이므로 현재 임의 상한을 적용하지 않는다.
+- 문제는 제출 순간에도 `is_active = true`인지 다시 확인한다.
+
+#### 성공 응답
+
+- 상태 코드: `202 Accepted`
+
+```json
+{
+  "attempt_id": "20000000-0000-0000-0000-000000000001",
+  "context_type": "LEARNING",
+  "status": "PENDING",
+  "is_correct": null,
+  "used_hint": false,
+  "attempted_at": "2026-08-31T12:00:00Z"
+}
+```
+
+#### 저장 및 transaction
+
+- `TASK_ATTEMPTS.user_id`는 현재 사용자 ID로 저장한다.
+- 제출 코드와 모든 context 연결 ID를 함께 저장한다.
+- 채점 전이므로 `status = PENDING`, `is_correct = null`이다.
+- INSERT commit이 실패하면 rollback하고 접수 성공 응답을 반환하지 않는다.
+- commit 성공 이후에만 향후 백그라운드 채점 작업을 시작한다.
+
+#### Frontend 처리
+
+- `202`를 정답 판정 완료가 아니라 채점 접수 성공으로 해석한다.
+- `attempt_id`를 보관하고 결과 조회 API를 polling한다.
+- 요청 중 제출 버튼 잠금은 UX 보조 수단이며 서버의 중복 방지 정책을 대신하지 않는다.
+- `422`는 필드 오류를 표시하고, `TASK_NOT_FOUND`는 문제 목록을 다시 조회한다.
 
 ---
 
@@ -1418,3 +1767,11 @@ Backend가 PostgreSQL에 `SELECT 1`을 실행하여 실제 DB 연결 가능 여�
 | 2026-08-31 | 현재 사용자 출석 체크 API 및 호환 endpoint 정책 추가 | Backend |
 | 2026-08-31 | 연속 출석 계산 정책 및 날짜 경계 테스트 추가 | Backend |
 | 2026-08-31 | 중복 출석·중복 보상 차단 및 rollback 정책 추가 | Backend |
+| 2026-08-31 | 개념 목록 조회 Backend·Frontend 공동 명세 추가 | Backend |
+| 2026-08-31 | 개념별 활성 문제 목록 공동 명세 추가 | Backend |
+| 2026-08-31 | 활성 문제 상세 조회 및 비공개 필드 명세 추가 | Backend |
+| 2026-08-31 | 전체 문제 진입 경로의 비활성 문제 제외 정책 추가 | Backend |
+| 2026-08-31 | 미확정 임계값에 대한 MVP 무잠금 정책과 `is_locked` 계약 추가 | Backend |
+| 2026-08-31 | 힌트 조회·사용 API와 `used_hint` 후속 연결 명세 추가 | Backend |
+| 2026-08-31 | 채점용 테스트 케이스 비공개 경계와 회귀 검사 추가 | Backend |
+| 2026-08-31 | context 기반 코드 제출 요청·PENDING 접수 계약 추가 | Backend |
