@@ -1675,18 +1675,96 @@ Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-U
 
 ## 11. 하우징 API
 
-```text
-상태: 작성 예정
+### 공통 규칙
+
+- `GET /users/{user_id}/house`는 다른 사용자의 하우징 방문을 위해 공개한다.
+- 배치, 이동, 회수, 벽지 및 바닥 변경 요청에는 `X-User-ID`가 필요하며,
+  경로의 `user_id`와 현재 사용자 ID가 다르면 `403 USER_ACCESS_DENIED`다.
+- 배치 가능한 아이템 category는 `FURNITURE`다. 벽지와 바닥은 각각
+  `WALLPAPER`, `FLOOR`만 적용할 수 있다.
+- 좌표는 하우징 영역의 백분율 값이며 `x`, `y`는 `0` 이상 `100` 이하다.
+  `rotation`은 `-360` 이상 `360` 이하이고 기본값은 `0`, `scale`은
+  `0.25` 이상 `3` 이하이고 기본값은 `1`이다. 정의되지 않은 위치 필드는
+  `422 VALIDATION_ERROR`로 거절한다.
+
+### `GET /users/{user_id}/house`
+
+사용자의 하우스 레벨, 적용한 벽지·바닥과 배치 가구를 조회한다. 존재하지 않는
+사용자는 `404 USER_NOT_FOUND`다.
+
+```json
+{
+  "user_id": "11111111-1111-1111-1111-111111111111",
+  "house_level": 1,
+  "wallpaper_item_id": 1,
+  "floor_item_id": 2,
+  "placed_objects": [
+    {
+      "placed_object_id": "22222222-2222-2222-2222-222222222222",
+      "item_id": 4,
+      "category": "FURNITURE",
+      "name": "학습용 책상",
+      "position_data": {"x": 40, "y": 65, "rotation": 0, "scale": 1}
+    }
+  ]
+}
 ```
 
-포함할 API:
+### `POST /users/{user_id}/house/objects`
 
-- 보유 가구 조회
-- 가구 배치 조회
-- 가구 배치 저장
-- 벽지 적용
-- 바닥 적용
-- 다른 사용자 하우징 조회
+보유한 가구 한 개를 배치하고 `201`로 배치 결과를 반환한다.
+
+```json
+{
+  "item_id": 4,
+  "position_data": {"x": 40, "y": 65, "rotation": 0, "scale": 1}
+}
+```
+
+서버는 해당 Inventory 행을 잠근 뒤 같은 아이템의 배치 개수가 보유 수량보다
+적은지 확인한다. 보유하지 않은 아이템은 `409 ITEM_NOT_OWNED`, 가구가 아닌
+아이템은 `409 ITEM_NOT_PLACEABLE`, 수량을 초과하면
+`409 PLACEMENT_QUANTITY_EXCEEDED`다.
+
+### `PATCH /users/{user_id}/house/objects/{placed_object_id}`
+
+본인이 배치한 가구의 위치 전체를 교체한다. 요청 body는
+`{"position_data": PositionData}`이며, 대상이 없거나 본인 소유가 아니면
+`404 PLACED_OBJECT_NOT_FOUND`다.
+
+### `DELETE /users/{user_id}/house/objects/{placed_object_id}`
+
+본인이 배치한 가구를 회수한다.
+
+```json
+{
+  "placed_object_id": "22222222-2222-2222-2222-222222222222",
+  "removed": true
+}
+```
+
+### `PUT /users/{user_id}/house/wallpaper`
+
+### `PUT /users/{user_id}/house/floor`
+
+두 API 모두 `{"item_id": 1}` 형식으로 보유 아이템을 지정한다. 아이템을
+보유하지 않았으면 `409 ITEM_NOT_OWNED`, endpoint와 category가 맞지 않으면
+`409 INVALID_SURFACE_CATEGORY`다. 성공 응답은 다음 형식이다.
+
+```json
+{
+  "surface": "WALLPAPER",
+  "item_id": 1
+}
+```
+
+### Frontend 하우징 처리
+
+- 현재 사용자 하우스와 Inventory를 함께 조회해 배치·적용 버튼을 구성한다.
+- `FURNITURE`는 배치, `WALLPAPER`와 `FLOOR`는 각 표면 적용 버튼만 노출한다.
+- 배치 결과의 `placed_object_id`를 이동 및 회수 요청에 사용한다.
+- 변경 성공 후 하우스와 Inventory를 다시 조회해 서버 상태로 화면을 갱신한다.
+- 다른 사용자 하우스에서는 조회 화면만 제공하고 변경 버튼을 노출하지 않는다.
 
 ---
 

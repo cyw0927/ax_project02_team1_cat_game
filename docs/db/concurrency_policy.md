@@ -31,6 +31,20 @@ SELECT id, soft_balance FROM users WHERE id = :user_id FOR UPDATE;
 ### 출석/중복 보상
 `UNIQUE(user_id, check_in_date)` 같은 DB 제약을 우선합니다.
 
+### 하우징 가구 배치
+같은 가구의 동시 배치 요청이 Inventory 수량을 함께 통과하지 않도록 해당
+`(user_id, item_id)` Inventory 행을 짧게 잠급니다. 잠금 후 현재 배치 개수를
+계산하고 `placed_count < quantity`인 경우에만 `placed_objects`를 추가합니다.
+
+```sql
+SELECT * FROM inventories
+WHERE user_id = :user_id AND item_id = :item_id AND quantity > 0
+FOR UPDATE;
+```
+
+위치 변경과 회수에는 외부 I/O가 없으며 대상 소유권을 같은 transaction에서
+확인합니다.
+
 ### 방 참가
 방 상태, 정원, 참가자 추가를 한 트랜잭션에서 직렬화해야 하므로 Room row에 대한 짧은 `FOR UPDATE`는 허용합니다.
 

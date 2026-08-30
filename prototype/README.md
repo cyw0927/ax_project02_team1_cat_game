@@ -43,7 +43,7 @@ prototype/
 - 정답 완료 후 사용자 일반 재화와 개념 숙련도를 다시 조회해 화면 갱신
 - 상점: 상품 목록·상세, idempotency key 구매, 보유 수량·일반 재화 갱신
 - 인벤토리: `GET /users/{user_id}/inventory` 함수 포함
-- 하우징: 조회, 가구 배치/이동/삭제, wallpaper/floor 적용 함수 포함
+- 하우징: Inventory 기반 가구 배치·이동·회수와 wallpaper/floor 적용 UI
 - 보유 고양이: `GET /users/{user_id}/cats`
 - 스타터: `POST /users/{user_id}/cats/starter`
 - 사용자 재화: `GET /users/{user_id}`

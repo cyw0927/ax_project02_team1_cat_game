@@ -327,13 +327,96 @@ async function buy(button) {
 async function loadHouse() {
   if (!state.userId) return message('로컬 모드에서는 기본 하우스를 사용합니다.');
   try {
-    state.house = await api.house(state.userId);
+    const [house, inventory] = await Promise.all([
+      api.house(state.userId),
+      api.inventory(state.userId),
+    ]);
+    state.house = house;
+    state.inventory = inventory;
     $('#houseStatus').textContent = `하우스 Lv.${state.house.house_level} · 배치 ${state.house.placed_objects.length}개`;
-    $('#placedItems').innerHTML = state.house.placed_objects.map((object) => `<div class="placed">${object.name} <small>${JSON.stringify(object.position_data)}</small></div>`).join('') || '<p>배치된 가구가 없습니다.</p>';
+    $('#houseInventory').innerHTML = inventory.map((item) => {
+      const surface = item.category === 'WALLPAPER'
+        ? 'wallpaper'
+        : item.category === 'FLOOR' ? 'floor' : null;
+      const action = surface
+        ? `<button data-surface="${surface}" data-item-id="${item.item_id}">적용</button>`
+        : `<button data-place="${item.item_id}">배치</button>`;
+      return `<div class="house-item"><b>${item.name}</b><small>${item.category} · 보유 ${item.quantity}개</small><div class="house-actions">${action}</div></div>`;
+    }).join('') || '<p>보유 아이템이 없습니다.</p>';
+    $('#placedItems').innerHTML = state.house.placed_objects.map((object) => `<div class="house-item"><b>${object.name || `아이템 ${object.item_id}`}</b><small>x ${object.position_data.x} · y ${object.position_data.y}</small><div class="house-actions"><button data-move="${object.placed_object_id}">오른쪽 이동</button><button data-remove="${object.placed_object_id}">회수</button></div></div>`).join('') || '<p>배치된 가구가 없습니다.</p>';
     debug('GET /users/{id}/house');
   } catch (error) {
     message('하우스 조회 실패');
     debug(error.message);
+  }
+}
+
+async function placeFurniture(button) {
+  if (!state.userId) return message('사용자 UUID를 먼저 연결하세요.');
+  button.disabled = true;
+  const itemId = Number(button.dataset.place);
+  const index = state.house?.placed_objects.length || 0;
+  try {
+    await api.place(state.userId, itemId, {
+      x: 20 + ((index * 13) % 60),
+      y: 65,
+      rotation: 0,
+      scale: 1,
+    });
+    message('가구를 배치했어요.');
+    await loadHouse();
+  } catch (error) {
+    message(`배치 실패: ${error.message}`);
+    debug(`가구 배치 실패 · ${error.code} · ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function applySurface(button) {
+  button.disabled = true;
+  try {
+    await api.surface(state.userId, button.dataset.surface, Number(button.dataset.itemId));
+    message(button.dataset.surface === 'wallpaper' ? '벽지를 적용했어요.' : '바닥을 적용했어요.');
+    await loadHouse();
+  } catch (error) {
+    message(`적용 실패: ${error.message}`);
+    debug(`표면 적용 실패 · ${error.code} · ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function movePlacedObject(button) {
+  const placedId = button.dataset.move;
+  const object = state.house?.placed_objects.find((row) => row.placed_object_id === placedId);
+  if (!object) return;
+  button.disabled = true;
+  try {
+    await api.move(state.userId, placedId, {
+      ...object.position_data,
+      x: (Number(object.position_data.x) + 10) % 100,
+    });
+    await loadHouse();
+  } catch (error) {
+    message(`이동 실패: ${error.message}`);
+    debug(`가구 이동 실패 · ${error.code} · ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function removePlacedObject(button) {
+  button.disabled = true;
+  try {
+    await api.remove(state.userId, button.dataset.remove);
+    message('가구를 인벤토리로 회수했어요.');
+    await loadHouse();
+  } catch (error) {
+    message(`회수 실패: ${error.message}`);
+    debug(`가구 회수 실패 · ${error.code} · ${error.message}`);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -369,6 +452,14 @@ document.addEventListener('click', (event) => {
   if (demo) return message('DEMO 흐름입니다 · 실제 재화는 변하지 않아요.');
   const product = event.target.closest('[data-buy]');
   if (product) return buy(product);
+  const place = event.target.closest('[data-place]');
+  if (place) return placeFurniture(place);
+  const surface = event.target.closest('[data-surface]');
+  if (surface) return applySurface(surface);
+  const move = event.target.closest('[data-move]');
+  if (move) return movePlacedObject(move);
+  const remove = event.target.closest('[data-remove]');
+  if (remove) return removePlacedObject(remove);
 });
 addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#debugPanel').open) go('home');
