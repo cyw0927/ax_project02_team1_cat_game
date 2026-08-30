@@ -33,3 +33,10 @@ class ErrorResponse(SchemaBase):
     """모든 API에서 사용하는 공통 오류 응답."""
 
     error: ErrorInfo
+
+
+class HealthResponse(SchemaBase):
+    """서버와 데이터베이스 상태 응답."""
+
+    status: str
+    database: str

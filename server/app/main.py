@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import CORS_ORIGINS
 from app.core.exception_handlers import register_exception_handlers
+from app.core.router import router as system_router
 from app.battle.router import router as battle_router
 from app.cats.router import router as cats_router
 from app.economy.router import router as economy_router
@@ -25,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(system_router)
 app.include_router(learning_router)
 app.include_router(economy_router)
 app.include_router(cats_router)
