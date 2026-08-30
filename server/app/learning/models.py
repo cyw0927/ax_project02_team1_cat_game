@@ -1,7 +1,15 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,7 +19,10 @@ from app.db.database import Base
 class Concept(Base):
     __tablename__ = "concepts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
     name: Mapped[str] = mapped_column(String)
 
 
@@ -26,15 +37,28 @@ class Task(Base):
     concept_id: Mapped[int] = mapped_column(
         ForeignKey("concepts.id"),
     )
+    title: Mapped[str] = mapped_column(String)
     type: Mapped[str] = mapped_column(String)
     difficulty: Mapped[str] = mapped_column(String)
+    description: Mapped[str] = mapped_column(Text)
     template_code: Mapped[str] = mapped_column(Text)
     test_cases: Mapped[str] = mapped_column(Text)
+    hint_text: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean)
 
 
 class UserProficiency(Base):
     __tablename__ = "user_proficiency"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "concept_id",
+            name="uq_user_proficiency_user_concept",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -66,6 +90,11 @@ class TaskAttempt(Base):
     )
     submitted_code: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String)
-    is_correct: Mapped[bool] = mapped_column(Boolean)
+    is_correct: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+    )
     used_hint: Mapped[bool] = mapped_column(Boolean)
-    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )

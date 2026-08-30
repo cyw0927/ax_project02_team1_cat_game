@@ -33,7 +33,11 @@ class RankingGroup(Base):
 class RankingParticipant(Base):
     __tablename__ = "ranking_participants"
     __table_args__ = (
-        UniqueConstraint("group_id", "user_id", name="uq_ranking_participant_user"),
+        UniqueConstraint(
+            "group_id",
+            "user_id",
+            name="uq_ranking_participants_group_user",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -65,18 +69,26 @@ class RankChallenge(Base):
         ForeignKey("ranking_groups.id"),
     )
     status: Mapped[str] = mapped_column(String)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )
 
 
 class RankChallengeTask(Base):
     __tablename__ = "rank_challenge_tasks"
     __table_args__ = (
         UniqueConstraint(
-            "challenge_id", "task_id", name="uq_rank_challenge_task"
+            "challenge_id",
+            "task_id",
+            name="uq_rank_challenge_tasks_challenge_task",
         ),
         UniqueConstraint(
-            "challenge_id", "task_order", name="uq_rank_challenge_task_order"
+            "challenge_id",
+            "task_order",
+            name="uq_rank_challenge_tasks_challenge_order",
         ),
     )
 
@@ -91,6 +103,12 @@ class RankChallengeTask(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tasks.id"),
     )
-    is_passed: Mapped[bool] = mapped_column(Boolean)
-    saved_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_passed: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+    )
+    saved_code: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
     task_order: Mapped[int] = mapped_column(Integer)
