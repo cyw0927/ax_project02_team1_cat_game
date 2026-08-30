@@ -10,6 +10,8 @@ export const state = {
   pendingPurchases: {},
   inventory: [],
   house: null,
+  gachaInfo: null,
+  pendingGachaRequest: null,
 };
 
 export function setUser(apiBase, userId) {

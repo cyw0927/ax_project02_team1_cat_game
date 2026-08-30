@@ -50,6 +50,12 @@ ITEM_SEEDS = (
     (3, "FURNITURE", "기본 캣타워", 800),
     (4, "FURNITURE", "학습용 책상", 600),
 )
+CAT_SEEDS = (
+    (1, "나비", "밝고 호기심이 많은 고양이", "N"),
+    (2, "구름", "느긋하고 다정한 고양이", "R"),
+    (3, "별이", "활발하고 장난기가 많은 고양이", "SR"),
+    (4, "루나", "차분하고 따뜻하게 응원해 주는 고양이", "SSR"),
+)
 
 
 def seed_concepts(db) -> int:
@@ -85,6 +91,17 @@ def seed_items(db) -> int:
     for item_id, category, name, price in ITEM_SEEDS:
         if db.get(Item, item_id) is None:
             db.add(Item(id=item_id, category=category, name=name, price=price))
+            created_count += 1
+    return created_count
+
+
+def seed_cats(db) -> int:
+    """고정 ID와 등급의 가챠 고양이를 멱등하게 생성한다."""
+
+    created_count = 0
+    for cat_id, name, persona, rarity in CAT_SEEDS:
+        if db.get(Cat, cat_id) is None:
+            db.add(Cat(id=cat_id, name=name, persona=persona, rarity=rarity))
             created_count += 1
     return created_count
 
@@ -260,37 +277,7 @@ def seed_master_data() -> None:
 
         created_count += seed_items(db)
 
-        cats = [
-            Cat(
-                id=1,
-                name="나비",
-                persona="밝고 호기심이 많은 고양이",
-                rarity="N",
-            ),
-            Cat(
-                id=2,
-                name="구름",
-                persona="느긋하고 다정한 고양이",
-                rarity="R",
-            ),
-            Cat(
-                id=3,
-                name="별이",
-                persona="활발하고 장난기가 많은 고양이",
-                rarity="SR",
-            ),
-            Cat(
-                id=4,
-                name="루나",
-                persona="차분하고 따뜻하게 응원해 주는 고양이",
-                rarity="SSR",
-            ),
-        ]
-
-        for cat in cats:
-            if db.get(Cat, cat.id) is None:
-                db.add(cat)
-                created_count += 1
+        created_count += seed_cats(db)
 
         dev_user_exists = db.scalar(
             select(User.id).where(

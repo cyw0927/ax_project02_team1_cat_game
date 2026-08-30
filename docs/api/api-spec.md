@@ -1770,16 +1770,101 @@ Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-U
 
 ## 12. 가챠 API
 
-```text
-상태: 작성 예정
+### 가챠 정책
+
+- 비용은 유료 재화 `hard_balance`에서 차감한다.
+- 1회는 10, 10회는 90이며 클라이언트가 가격이나 당첨 결과를 전달하지 않는다.
+- 일반 확률은 N 고양이 40%, R 25%, SR 10%, SSR 5%, 아이템 20%다.
+  아이템 4종은 각각 5%다.
+- 10회 뽑기의 마지막 1회는 SR 고양이 80%, SSR 고양이 20% 확정이다.
+- 처음 얻은 고양이는 `USER_CATS`에 지급한다. 중복 고양이는 N 5, R 10,
+  SR 25, SSR 100 마일리지로 전환한다.
+- 아이템은 `INVENTORIES`에 생성하거나 기존 수량을 증가시킨다.
+- 사용자 행을 잠근 짧은 transaction에서 재화 차감과 모든 보상 지급을 함께
+  commit하며, 하나라도 실패하면 전체를 rollback한다.
+
+### `GET /gacha`
+
+인증 없이 서버의 현재 비용, 일반 확률표, 10회 보장 및 중복 마일리지 정책을
+조회한다.
+
+```json
+{
+  "currency": "HARD",
+  "single_cost": 10,
+  "ten_cost": 90,
+  "ten_pull_guarantee": "마지막 1회는 SR 이상 고양이 확정",
+  "duplicate_cat_mileage": {"N": 5, "R": 10, "SR": 25, "SSR": 100},
+  "pool": [
+    {
+      "reward_type": "CAT",
+      "target_id": 1,
+      "name": "나비",
+      "rarity": "N",
+      "probability_percent": 40
+    }
+  ]
+}
 ```
 
-포함할 API:
+### `POST /gacha/pull`
 
-- 가챠 정보 조회
-- 1회 뽑기
-- 10회 뽑기
-- 가챠 결과 조회
+`X-User-ID`가 필요한 실제 뽑기 API다.
+
+```json
+{
+  "count": 10,
+  "request_id": "33333333-3333-3333-3333-333333333333"
+}
+```
+
+`count`는 `1` 또는 `10`만 허용한다. 잔액이 부족하면
+`409 INSUFFICIENT_HARD_BALANCE`다. 같은 `request_id`와 횟수를 다시 보내면
+재화와 보상을 다시 적용하지 않고 저장된 결과를 `replayed: true`로 반환한다.
+같은 ID를 다른 횟수에 사용하면 `409 GACHA_REQUEST_CONFLICT`다.
+
+```json
+{
+  "request_id": "33333333-3333-3333-3333-333333333333",
+  "count": 1,
+  "cost": 10,
+  "current_hard_balance": 90,
+  "current_mileage": 10,
+  "results": [
+    {
+      "draw_index": 1,
+      "reward_type": "CAT",
+      "target_id": 2,
+      "name": "구름",
+      "rarity": "R",
+      "is_new": false,
+      "quantity": null,
+      "mileage_awarded": 10
+    }
+  ],
+  "replayed": false
+}
+```
+
+아이템 결과는 `quantity`에 지급 후 보유 수량이 들어가며
+`mileage_awarded`는 0이다.
+
+### `GET /gacha/results/{request_id}`
+
+현재 사용자의 마지막 가챠 요청 결과를 다시 조회한다. 다른 요청이 이미 처리돼
+마지막 결과가 교체됐거나 ID가 다르면 `404 GACHA_RESULT_NOT_FOUND`다. 별도
+가챠 이력 테이블을 만들지 않고 `USERS`에 마지막 요청과 결과만 보관해 전체
+테이블 수를 19개로 유지한다.
+
+### Frontend 가챠 처리
+
+- 화면 진입 시 `GET /gacha`와 사용자 정보를 함께 조회해 서버 비용을 표시한다.
+- `crypto.randomUUID()`로 요청 ID를 만들고 응답을 받기 전까지 같은 ID를
+  재사용한다. 뽑기 요청에는 일반 HTTP 자동 재시도를 적용하지 않는다.
+- 처리 중 1회·10회 버튼을 모두 잠그고, 성공 응답으로 유료 재화와 마일리지를
+  갱신한 뒤 보유 고양이를 다시 조회한다.
+- 고양이 결과는 신규 여부 또는 중복 마일리지를, 아이템 결과는 지급 후 수량을
+  표시한다.
 
 ---
 

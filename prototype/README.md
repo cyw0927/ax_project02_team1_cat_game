@@ -44,6 +44,7 @@ prototype/
 - 상점: 상품 목록·상세, idempotency key 구매, 보유 수량·일반 재화 갱신
 - 인벤토리: `GET /users/{user_id}/inventory` 함수 포함
 - 하우징: Inventory 기반 가구 배치·이동·회수와 wallpaper/floor 적용 UI
+- 가챠: 서버 확률 조회, 유료 재화 1회·10회 뽑기, 고양이·아이템 결과 반영
 - 보유 고양이: `GET /users/{user_id}/cats`
 - 스타터: `POST /users/{user_id}/cats/starter`
 - 사용자 재화: `GET /users/{user_id}`
@@ -56,8 +57,7 @@ UUID가 없으면 로컬 스타터 주황 고양이 한 마리를 즉시 표시�
 
 - 일일 미션 백엔드와 실제 보상
 - 배틀 실시간 점수와 WebSocket
-- 가챠 API, 확률, 비용 (현재 화면은 재화 차감·DB 저장 없는 명시적 DEMO 흐름)
 - JWT와 회원가입
 - 랭킹·승급전 최종 규칙 일부
 
-DEMO 버튼은 실제 재화나 DB를 변경하지 않습니다. 미확정 경제·가챠·하우스 규칙도 임의로 확정하지 않습니다.
+DEMO 버튼은 실제 재화나 DB를 변경하지 않습니다.

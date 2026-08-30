@@ -5,11 +5,11 @@ import { renderCats } from './cat.js';
 const $ = (selector) => document.querySelector(selector);
 const toast = $('#toast');
 const log = $('#debugLog');
-const demoCats = [
-  { name: '주황 고양이', rarity: 'STARTER', asset: 'assets/cats/cat_1_orange_walk.webp' },
-  { name: '검정 고양이', rarity: 'DEMO', asset: 'assets/cats/cat_2_black_walk.webp' },
-  { name: '흰 고양이', rarity: 'DEMO', asset: 'assets/cats/cat_3_white_walk.webp' },
-];
+const catAssets = {
+  1: 'assets/cats/cat_1_orange_walk.webp',
+  2: 'assets/cats/cat_2_black_walk.webp',
+  3: 'assets/cats/cat_3_white_walk.webp',
+};
 let toastTimer;
 let pulling = false;
 let learningLoadedForUser = null;
@@ -47,6 +47,7 @@ function go(id) {
   if (id === 'learn' && learningLoadedForUser !== state.userId) loadConcepts();
   if (id === 'shop') loadItems();
   if (id === 'house' && state.userId) loadHouse();
+  if (id === 'gacha') loadGachaInfo();
 }
 
 async function connect() {
@@ -63,6 +64,9 @@ async function connect() {
     state.cats = await api.cats(state.userId);
     const user = await api.user(state.userId);
     $('#balance').textContent = Number(user.soft_balance ?? user.balance ?? 0).toLocaleString();
+    $('#hardBalance').textContent = Number(user.hard_balance ?? 0).toLocaleString();
+    $('#gachaHardBalance').textContent = Number(user.hard_balance ?? 0).toLocaleString();
+    $('#gachaMileage').textContent = Number(user.mileage ?? 0).toLocaleString();
     renderCats(state.cats);
     debug(`DB 고양이 ${state.cats.length}마리 로드`);
     message('사용자 데이터를 불러왔어요.');
@@ -420,29 +424,96 @@ async function removePlacedObject(button) {
   }
 }
 
-async function demoPull() {
+async function loadGachaInfo() {
+  if (!requireUser()) return;
+  const buttons = document.querySelectorAll('[data-gacha-count]');
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const [info, user] = await Promise.all([api.gachaInfo(), api.user(state.userId)]);
+    state.gachaInfo = info;
+    $('#gachaHardBalance').textContent = Number(user.hard_balance).toLocaleString();
+    $('#gachaMileage').textContent = Number(user.mileage).toLocaleString();
+    $('#hardBalance').textContent = Number(user.hard_balance).toLocaleString();
+    $('#gachaPolicy').textContent = `1회 💎 ${info.single_cost} · 10회 💎 ${info.ten_cost} · ${info.ten_pull_guarantee}`;
+    buttons.forEach((button) => {
+      const count = Number(button.dataset.gachaCount);
+      const cost = count === 1 ? info.single_cost : info.ten_cost;
+      button.textContent = `${count}회 뽑기 · 💎 ${cost}`;
+      button.disabled = false;
+    });
+    debug('GET /gacha · 확률과 비용 로드');
+  } catch (error) {
+    $('#gachaMessage').textContent = `${error.message} 다시 시도해 주세요.`;
+    debug(`가챠 정보 실패 · ${error.code} · ${error.message}`);
+  }
+}
+
+function renderGachaResults(results) {
+  const container = $('#gachaResults');
+  container.replaceChildren();
+  results.forEach((result) => {
+    const card = document.createElement('article');
+    card.className = 'gacha-prize';
+    card.dataset.rarity = result.rarity;
+    if (result.reward_type === 'CAT') {
+      const image = document.createElement('img');
+      image.src = catAssets[result.target_id] || catAssets[1];
+      image.alt = result.name;
+      card.append(image);
+    } else {
+      const icon = document.createElement('span');
+      icon.className = 'item-reward';
+      icon.textContent = '🎁';
+      card.append(icon);
+    }
+    const name = document.createElement('strong');
+    name.textContent = result.name;
+    const detail = document.createElement('small');
+    detail.textContent = result.reward_type === 'CAT'
+      ? `${result.rarity} · ${result.is_new ? '새 친구' : `중복 +${result.mileage_awarded} 마일리지`}`
+      : `아이템 · 보유 ${result.quantity}개`;
+    card.append(name, detail);
+    container.append(card);
+  });
+}
+
+async function pullGacha(button) {
   if (pulling) return;
+  if (!requireUser()) return;
   pulling = true;
-  const button = $('#demoPull');
   const machine = $('#gachaMachine');
-  const result = $('#gachaResult');
-  button.disabled = true;
-  result.hidden = true;
+  const buttons = document.querySelectorAll('[data-gacha-count]');
+  buttons.forEach((item) => { item.disabled = true; });
+  $('#gachaResults').replaceChildren();
   machine.classList.add('pulling');
-  $('#gachaMessage').textContent = '새 친구가 오는 중…';
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-  const cat = demoCats[Math.floor(Math.random() * demoCats.length)];
-  $('#gachaCat').src = cat.asset;
-  $('#gachaCat').alt = cat.name;
-  $('#gachaName').textContent = cat.name;
-  $('#gachaRarity').textContent = cat.rarity;
-  result.hidden = false;
-  machine.classList.remove('pulling');
-  $('#gachaMessage').textContent = '연출 미리보기 결과입니다. 실제 보유 목록에는 추가되지 않았어요.';
-  button.textContent = 'DEMO 다시 보기';
-  button.disabled = false;
-  pulling = false;
-  debug(`가챠 DEMO 결과 · ${cat.name} · 저장 없음`);
+  $('#gachaMessage').textContent = '서버에서 새 친구와 선물을 뽑는 중…';
+  const count = Number(button.dataset.gachaCount);
+  if (!state.pendingGachaRequest || state.pendingGachaRequest.count !== count) {
+    state.pendingGachaRequest = { count, requestId: crypto.randomUUID() };
+  }
+  try {
+    const [response] = await Promise.all([
+      api.gachaPull(count, state.pendingGachaRequest.requestId),
+      new Promise((resolve) => setTimeout(resolve, 700)),
+    ]);
+    renderGachaResults(response.results);
+    $('#gachaHardBalance').textContent = Number(response.current_hard_balance).toLocaleString();
+    $('#gachaMileage').textContent = Number(response.current_mileage).toLocaleString();
+    $('#hardBalance').textContent = Number(response.current_hard_balance).toLocaleString();
+    state.cats = await api.cats(state.userId);
+    renderCats(state.cats);
+    $('#gachaMessage').textContent = `${response.count}회 뽑기 완료! 보상이 보관함에 저장됐어요.`;
+    debug(`POST /gacha/pull · ${response.count}회 · 💎 ${response.cost}${response.replayed ? ' · 재조회' : ''}`);
+    state.pendingGachaRequest = null;
+  } catch (error) {
+    $('#gachaMessage').textContent = `${error.message} 재화와 보유 목록을 확인해 주세요.`;
+    debug(`가챠 실패 · ${error.code} · ${error.message}`);
+    if (error.status > 0 && error.status < 500) state.pendingGachaRequest = null;
+  } finally {
+    machine.classList.remove('pulling');
+    buttons.forEach((item) => { item.disabled = false; });
+    pulling = false;
+  }
 }
 
 document.addEventListener('click', (event) => {
@@ -460,6 +531,8 @@ document.addEventListener('click', (event) => {
   if (move) return movePlacedObject(move);
   const remove = event.target.closest('[data-remove]');
   if (remove) return removePlacedObject(remove);
+  const gacha = event.target.closest('[data-gacha-count]');
+  if (gacha) return pullGacha(gacha);
 });
 addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#debugPanel').open) go('home');
@@ -475,7 +548,6 @@ $('#submitAttempt').onclick = submit;
 $('#retryAttempt').onclick = retryAttemptResult;
 $('#loadItems').onclick = loadItems;
 $('#loadHouse').onclick = loadHouse;
-$('#demoPull').onclick = demoPull;
 $('#apiBase').value = state.apiBase;
 $('#userId').value = state.userId;
 renderCats(state.cats);

@@ -61,6 +61,14 @@ class User(Base):
         ForeignKey("items.id"),
         nullable=True,
     )
+    last_gacha_request_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    last_gacha_response: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

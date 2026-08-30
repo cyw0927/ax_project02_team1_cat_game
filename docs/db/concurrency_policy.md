@@ -45,6 +45,19 @@ FOR UPDATE;
 위치 변경과 회수에는 외부 I/O가 없으며 대상 소유권을 같은 transaction에서
 확인합니다.
 
+### 가챠
+1회 또는 10회 보상의 재화 차감, 고양이 지급, 아이템 지급과 중복 마일리지
+전환을 한 transaction에서 처리합니다. 같은 사용자의 동시 요청을 직렬화하기
+위해 사용자 행을 먼저 잠그며, Inventory 행도 조회 시 함께 잠급니다.
+
+```sql
+SELECT * FROM users WHERE id = :user_id FOR UPDATE;
+```
+
+`users.last_gacha_request_id`와 `last_gacha_response`에 마지막 결과를 저장해 같은
+요청 ID의 재전송에는 차감과 지급을 반복하지 않습니다. 별도 이력 테이블은
+추가하지 않아 ERD 테이블 수를 19개로 유지합니다.
+
 ### 방 참가
 방 상태, 정원, 참가자 추가를 한 트랜잭션에서 직렬화해야 하므로 Room row에 대한 짧은 `FOR UPDATE`는 허용합니다.
 

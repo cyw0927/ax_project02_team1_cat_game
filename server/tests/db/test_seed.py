@@ -2,6 +2,7 @@ import json
 import uuid
 
 from app.db.seed import (
+    CAT_SEEDS,
     CONCEPT_SEEDS,
     ITEM_SEEDS,
     TASK_CONCEPT_IDS,
@@ -9,9 +10,11 @@ from app.db.seed import (
     TASK_IDS,
     TASK_TYPE_CODE,
     seed_concepts,
+    seed_cats,
     seed_items,
     seed_tasks,
 )
+from app.cats.models import Cat
 from app.economy.models import Item
 from app.learning.models import Concept, Task
 
@@ -25,6 +28,15 @@ class ConceptSeedSession:
 
     def add(self, row) -> None:
         self.rows[(type(row), row.id)] = row
+
+
+def test_cat_seed_is_stable_and_idempotent():
+    db = ConceptSeedSession()
+
+    assert [row[3] for row in CAT_SEEDS] == ["N", "R", "SR", "SSR"]
+    assert seed_cats(db) == 4
+    assert seed_cats(db) == 0
+    assert db.get(Cat, 4).name == "루나"
 
 
 def test_item_seed_is_stable_and_idempotent():

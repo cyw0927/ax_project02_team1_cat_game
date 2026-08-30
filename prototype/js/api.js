@@ -67,4 +67,7 @@ export const api = {
   move: (id, placedId, position_data) => request(`/users/${id}/house/objects/${placedId}`, { method: 'PATCH', body: JSON.stringify({ position_data }) }),
   remove: (id, placedId) => request(`/users/${id}/house/objects/${placedId}`, { method: 'DELETE' }),
   surface: (id, type, item_id) => request(`/users/${id}/house/${type}`, { method: 'PUT', body: JSON.stringify({ item_id }) }),
+  gachaInfo: () => request('/gacha', { retry: 1 }),
+  gachaPull: (count, request_id) => request('/gacha/pull', { method: 'POST', body: JSON.stringify({ count, request_id }) }),
+  gachaResult: (requestId) => request(`/gacha/results/${requestId}`, { retry: 1 }),
 };
