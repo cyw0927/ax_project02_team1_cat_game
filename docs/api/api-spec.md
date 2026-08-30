@@ -1616,16 +1616,60 @@ Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-U
 
 ## 10. 상점 및 인벤토리 API
 
-```text
-상태: 작성 예정
+### `GET /items`
+
+서버에 등록된 상품을 ID 순으로 반환한다. 응답 필드는 `id`, `category`,
+`name`, `price`이며 가격은 서버 데이터만 기준으로 사용한다.
+
+### `GET /items/{item_id}`
+
+상품 상세를 반환한다. 존재하지 않으면 `404 ITEM_NOT_FOUND`다.
+
+### `POST /shop/buy`
+
+`X-User-ID`로 식별한 현재 사용자가 일반 재화로 상품을 구매한다. Body에는
+사용자 ID와 가격을 넣지 않는다.
+
+```json
+{
+  "item_id": 4,
+  "purchase_request_id": "30000000-0000-0000-0000-000000000001"
+}
 ```
 
-포함할 API:
+- 서버가 `ITEMS.price`를 다시 조회한다.
+- 사용자 row를 짧게 잠그고 `soft_balance >= price`를 확인한다.
+- 잔액 차감과 Inventory 생성·수량 증가를 하나의 transaction으로 처리한다.
+- 잔액 부족은 `409 INSUFFICIENT_SOFT_BALANCE`다.
+- `purchase_request_id`는 구매 버튼 동작마다 Frontend가 생성하는 UUID다.
+- 같은 요청 ID를 같은 사용자·상품에 재전송하면 재차 차감하지 않고
+  `replayed = true`로 현재 결과를 반환한다.
+- 다른 구매에 사용된 요청 ID를 재사용하면 `409 PURCHASE_REQUEST_CONFLICT`다.
+- commit 실패 시 잔액과 Inventory 변경을 모두 rollback한다.
 
-- 상품 목록 조회
-- 상품 상세 조회
-- 상품 구매
-- 보유 아이템 조회
+```json
+{
+  "status": "success",
+  "current_soft_balance": 400,
+  "item_id": 4,
+  "item_name": "학습용 책상",
+  "quantity": 1,
+  "replayed": false
+}
+```
+
+### `GET /users/{user_id}/inventory`
+
+현재 사용자의 보유 아이템과 수량을 반환한다. 경로 ID가 현재 사용자와 다르면
+`403 USER_ACCESS_DENIED`다.
+
+### Frontend 상점 처리
+
+- 상품과 현재 사용자 Inventory를 함께 조회해 보유 수량을 표시한다.
+- 구매 처리 중 해당 버튼을 잠가 연속 클릭을 막는다.
+- 네트워크 또는 5xx 오류 후 다시 누르면 보관한 동일 요청 ID를 재사용한다.
+- 성공 응답의 `current_soft_balance`와 `quantity`로 화면을 갱신한다.
+- 4xx 오류에서는 요청 ID를 폐기하고 서버 오류 메시지를 표시한다.
 
 ---
 

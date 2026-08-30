@@ -281,8 +281,16 @@ async function retryAttemptResult() {
 
 async function loadItems() {
   try {
-    const items = await api.items();
-    $('#shopItems').innerHTML = items.map((item) => `<article class="item"><small class="surface">${item.category}</small><b>${item.name}</b><span>🪙 ${Number(item.price).toLocaleString()}</span><button class="primary" data-buy="${item.id}">구매</button></article>`).join('') || '<p>등록된 상품이 없습니다.</p>';
+    const [items, inventory] = await Promise.all([
+      api.items(),
+      state.userId ? api.inventory(state.userId) : Promise.resolve([]),
+    ]);
+    state.inventory = inventory;
+    const quantities = new Map(inventory.map((row) => [row.item_id, row.quantity]));
+    $('#shopItems').innerHTML = items.map((item) => {
+      const quantity = quantities.get(item.id) || 0;
+      return `<article class="item"><small class="surface">${item.category}</small><b>${item.name}</b><span>🪙 ${Number(item.price).toLocaleString()}</span><small>보유 ${quantity}개</small><button class="primary" data-buy="${item.id}">구매</button></article>`;
+    }).join('') || '<p>등록된 상품이 없습니다.</p>';
     debug(`GET /items · ${items.length}개`);
   } catch (error) {
     $('#shopItems').innerHTML = '<p>FastAPI를 실행하면 실제 상품이 표시됩니다.</p>';
@@ -290,16 +298,29 @@ async function loadItems() {
   }
 }
 
-async function buy(itemId) {
+async function buy(button) {
   if (!state.userId) return message('구매하려면 사용자 UUID를 연결하세요.');
+  const itemId = Number(button.dataset.buy);
+  const requestId = state.pendingPurchases[itemId] || crypto.randomUUID();
+  state.pendingPurchases[itemId] = requestId;
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = '구매 처리 중…';
   try {
-    const result = await api.buy(state.userId, Number(itemId));
-    $('#balance').textContent = Number(result.current_balance).toLocaleString();
-    message(`${result.item_name} 구매 완료`);
+    const result = await api.buy(itemId, requestId);
+    delete state.pendingPurchases[itemId];
+    $('#balance').textContent = Number(result.current_soft_balance).toLocaleString();
+    const quantityLabel = button.parentElement.querySelector('small:last-of-type');
+    if (quantityLabel) quantityLabel.textContent = `보유 ${result.quantity}개`;
+    message(`${result.item_name} ${result.replayed ? '구매 결과 확인' : '구매 완료'}`);
     debug(`POST /shop/buy · item ${itemId}`);
   } catch (error) {
+    if (error.status > 0 && error.status < 500) delete state.pendingPurchases[itemId];
     message(`구매 실패: ${error.message}`);
-    debug(error.message);
+    debug(`구매 실패 · ${error.code} · ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
   }
 }
 
@@ -347,7 +368,7 @@ document.addEventListener('click', (event) => {
   const demo = event.target.closest('[data-demo]');
   if (demo) return message('DEMO 흐름입니다 · 실제 재화는 변하지 않아요.');
   const product = event.target.closest('[data-buy]');
-  if (product) return buy(product.dataset.buy);
+  if (product) return buy(product);
 });
 addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#debugPanel').open) go('home');

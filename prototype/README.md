@@ -41,7 +41,7 @@ prototype/
 - 학습: 개념 목록 → 개념별 문제 → 문제 상세 → 힌트 → 제출 → 결과 polling
 - 인증 학습 요청은 Debug에서 연결한 UUID를 `X-User-ID` 헤더로 전송
 - 정답 완료 후 사용자 일반 재화와 개념 숙련도를 다시 조회해 화면 갱신
-- 상점: `GET /items`, `POST /shop/buy`
+- 상점: 상품 목록·상세, idempotency key 구매, 보유 수량·일반 재화 갱신
 - 인벤토리: `GET /users/{user_id}/inventory` 함수 포함
 - 하우징: 조회, 가구 배치/이동/삭제, wallpaper/floor 적용 함수 포함
 - 보유 고양이: `GET /users/{user_id}/cats`

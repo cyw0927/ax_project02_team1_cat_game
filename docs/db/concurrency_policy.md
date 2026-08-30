@@ -16,16 +16,17 @@ DB는 상태 저장과 원자성 보장을 담당하고, 장시간 작업과 실
 ## 현재 적용 예
 
 ### 상점 구매
-잔액 차감은 조건부 UPDATE를 사용합니다.
+구매 idempotency 상태와 잔액·Inventory를 함께 변경하므로 사용자 row를 짧게
+잠급니다. 잠금 후 서버 가격과 `soft_balance >= price`를 확인하고 동일
+transaction에서 차감과 수량 증가를 수행합니다.
 
 ```sql
-UPDATE users
-SET balance = balance - :price
-WHERE id = :user_id
-  AND balance >= :price;
+SELECT id, soft_balance FROM users WHERE id = :user_id FOR UPDATE;
 ```
 
-별도 `FOR UPDATE`로 잔액을 선점하지 않습니다.
+`inventories.last_purchase_request_id`의 UNIQUE 제약과 사용자 row 잠금으로 같은
+요청 ID의 동시 재전송을 한 번만 적용합니다. 외부 I/O 없이 짧은 DB transaction
+안에서 끝냅니다.
 
 ### 출석/중복 보상
 `UNIQUE(user_id, check_in_date)` 같은 DB 제약을 우선합니다.

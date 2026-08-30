@@ -32,6 +32,10 @@ class Inventory(Base):
             "item_id",
             name="uq_inventories_user_item",
         ),
+        UniqueConstraint(
+            "last_purchase_request_id",
+            name="uq_inventories_last_purchase_request_id",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -46,3 +50,7 @@ class Inventory(Base):
         ForeignKey("items.id"),
     )
     quantity: Mapped[int] = mapped_column(Integer)
+    last_purchase_request_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )

@@ -3,13 +3,16 @@ import uuid
 
 from app.db.seed import (
     CONCEPT_SEEDS,
+    ITEM_SEEDS,
     TASK_CONCEPT_IDS,
     TASK_DIFFICULTY_BASIC,
     TASK_IDS,
     TASK_TYPE_CODE,
     seed_concepts,
+    seed_items,
     seed_tasks,
 )
+from app.economy.models import Item
 from app.learning.models import Concept, Task
 
 
@@ -22,6 +25,20 @@ class ConceptSeedSession:
 
     def add(self, row) -> None:
         self.rows[(type(row), row.id)] = row
+
+
+def test_item_seed_is_stable_and_idempotent():
+    db = ConceptSeedSession()
+
+    assert ITEM_SEEDS == (
+        (1, "WALLPAPER", "파란 별 벽지", 500),
+        (2, "FLOOR", "원목 바닥", 400),
+        (3, "FURNITURE", "기본 캣타워", 800),
+        (4, "FURNITURE", "학습용 책상", 600),
+    )
+    assert seed_items(db) == 4
+    assert seed_items(db) == 0
+    assert db.get(Item, 4).price == 600
 
 
 def test_concept_seed_has_stable_ids_and_names():

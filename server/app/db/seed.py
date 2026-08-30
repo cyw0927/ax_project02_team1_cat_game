@@ -44,6 +44,12 @@ TASK_CONCEPT_IDS = {
 }
 TASK_TYPE_CODE = "CODE"
 TASK_DIFFICULTY_BASIC = "BASIC"
+ITEM_SEEDS = (
+    (1, "WALLPAPER", "파란 별 벽지", 500),
+    (2, "FLOOR", "원목 바닥", 400),
+    (3, "FURNITURE", "기본 캣타워", 800),
+    (4, "FURNITURE", "학습용 책상", 600),
+)
 
 
 def seed_concepts(db) -> int:
@@ -69,6 +75,17 @@ def seed_tasks(db, tasks: list[Task]) -> int:
             db.add(task)
             created_count += 1
 
+    return created_count
+
+
+def seed_items(db) -> int:
+    """고정 ID와 서버 가격의 기본 상점 상품을 멱등하게 생성한다."""
+
+    created_count = 0
+    for item_id, category, name, price in ITEM_SEEDS:
+        if db.get(Item, item_id) is None:
+            db.add(Item(id=item_id, category=category, name=name, price=price))
+            created_count += 1
     return created_count
 
 
@@ -241,37 +258,7 @@ def seed_master_data() -> None:
 
         created_count += seed_tasks(db, tasks)
 
-        items = [
-            Item(
-                id=1,
-                category="WALLPAPER",
-                name="파란 별 벽지",
-                price=500,
-            ),
-            Item(
-                id=2,
-                category="FLOOR",
-                name="원목 바닥",
-                price=400,
-            ),
-            Item(
-                id=3,
-                category="FURNITURE",
-                name="기본 캣타워",
-                price=800,
-            ),
-            Item(
-                id=4,
-                category="FURNITURE",
-                name="학습용 책상",
-                price=600,
-            ),
-        ]
-
-        for item in items:
-            if db.get(Item, item.id) is None:
-                db.add(item)
-                created_count += 1
+        created_count += seed_items(db)
 
         cats = [
             Cat(

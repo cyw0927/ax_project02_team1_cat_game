@@ -7,6 +7,7 @@ export const state = {
   currentTask: null,
   usedHint: false,
   lastAttemptId: null,
+  pendingPurchases: {},
   inventory: [],
   house: null,
 };

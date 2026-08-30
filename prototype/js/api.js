@@ -53,7 +53,11 @@ export const api = {
   weakConcepts: (id) => request(`/users/${id}/weak-concepts`, { retry: 1 }),
   history: (id, limit = 20, offset = 0) => request(`/users/${id}/attempts?limit=${limit}&offset=${offset}`, { retry: 1 }),
   items: () => request('/items', { retry: 1 }),
-  buy: (user_id, item_id) => request('/shop/buy', { method: 'POST', body: JSON.stringify({ user_id, item_id }) }),
+  item: (id) => request(`/items/${id}`, { retry: 1 }),
+  buy: (item_id, purchase_request_id) => request('/shop/buy', {
+    method: 'POST',
+    body: JSON.stringify({ item_id, purchase_request_id }),
+  }),
   inventory: (id) => request(`/users/${id}/inventory`, { retry: 1 }),
   user: (id) => request(`/users/${id}`, { retry: 1 }),
   starter: (id) => request(`/users/${id}/cats/starter`, { method: 'POST' }),
