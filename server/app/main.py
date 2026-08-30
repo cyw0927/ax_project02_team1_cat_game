@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import CORS_ORIGINS
 from app.core.exception_handlers import register_exception_handlers
 from app.battle.router import router as battle_router
 from app.cats.router import router as cats_router
@@ -18,10 +19,7 @@ register_exception_handlers(app)
 # Keep this list narrow instead of allowing every origin.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

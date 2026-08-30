@@ -43,7 +43,70 @@ OpenAPI JSON: http://127.0.0.1:8000/openapi.json
   "created_at": "2026-08-30T15:30:00+09:00"
 }
 ```
+### 2.4 실행 환경변수
 
+Backend 실행 환경은 다음 환경변수를 사용한다.
+
+| 환경변수 | 공개 여부 | 설명 | 개발 환경 예시 |
+|---|---|---|---|
+| `APP_ENV` | 공개 가능 | 현재 실행 환경 | `development` |
+| `APP_HOST` | 공개 가능 | Backend 서버 실행 주소 | `127.0.0.1` |
+| `APP_PORT` | 공개 가능 | Backend 서버 실행 포트 | `8000` |
+| `CORS_ORIGINS` | 공개 가능 | Backend 접근이 허용된 Frontend 주소 목록 | `http://localhost:5500,http://127.0.0.1:5500` |
+| `DATABASE_URL` | 비공개 | PostgreSQL 접속 정보 | 명세서에 작성하지 않음 |
+| `SANDBOX_IMAGE` | 운영 설정 | 코드 채점용 Docker 이미지 | 채점 기능 구현 시 확정 |
+| `SANDBOX_TIMEOUT_SECONDS` | 운영 설정 | 코드 실행 제한 시간 | 채점 기능 구현 시 확정 |
+| `SANDBOX_MEMORY` | 운영 설정 | Docker 메모리 제한 | `128m` |
+| `SANDBOX_CPUS` | 운영 설정 | Docker CPU 제한 | `0.5` |
+| `SANDBOX_OUTPUT_BYTES` | 운영 설정 | 채점 결과 출력 크기 제한 | 채점 기능 구현 시 확정 |
+| `SANDBOX_MAX_CONCURRENCY` | 운영 설정 | 동시에 실행할 수 있는 채점 수 | `3` |
+
+실제 비밀번호와 API 키는 `server/.env`에만 저장하고 Git에 포함하지 않는다.
+
+팀원이 사용할 수 있는 공개 예시는 `server/.env.example`에 작성한다.
+
+### 2.5 CORS 정책
+
+개발 환경에서 Backend 접근이 허용된 Frontend 주소는 다음과 같다.
+
+http://localhost:5500
+http://127.0.0.1:5500
+
+Backend는 `CORS_ORIGINS` 환경변수에 등록된 주소만 브라우저 접근을 허용한다.
+
+여러 주소는 쉼표로 구분하며 주소 사이에 공백을 넣지 않는다.
+
+CORS_ORIGINS=http://localhost:5500,http://127.0.0.1:5500
+
+주소 끝에는 `/`를 붙이지 않는다.
+
+잘못된 예시:
+http://localhost:5500/
+
+
+올바른 예시:
+http://localhost:5500
+
+
+Frontend 개발 서버의 포트가 변경되면 Backend의 `CORS_ORIGINS`에도 새로운 주소를 추가해야 한다.
+
+운영 환경에서는 실제 배포된 Frontend 주소만 허용하고 `*` 전체 허용은 사용하지 않는다.
+
+### 2.6 Frontend 연동 주소
+
+개발 환경의 기본 Backend 주소는 다음과 같다.
+
+http://127.0.0.1:8000
+
+Frontend는 API 주소를 화면 코드에 여러 번 직접 작성하지 않고 별도의 Frontend 환경변수로 관리한다.
+
+Frontend 환경변수 이름은 Frontend 기술 스택이 확정되면 정한다.
+
+예시:
+
+VITE_API_BASE_URL=http://127.0.0.1:8000
+
+Frontend 개발 서버 주소나 포트가 변경되면 Backend 담당자에게 전달하여 CORS 허용 주소를 함께 수정한다.
 ---
 
 ## 3. Backend와 Frontend의 공통 원칙
@@ -478,3 +541,4 @@ API 성공 후 다시 조회해야 하는 데이터와 화면을 작성한다.
 |---|---|---|
 | 2026-08-30 | API 명세서 기본 구조 작성 | Backend |
 | 2026-08-30 | 공통 오류 응답 및 Frontend 오류 처리 규칙 추가 | Backend |
+| 2026-08-30 | 실행 환경변수, CORS 정책 및 Frontend 연동 주소 추가 | Backend |

@@ -4,6 +4,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+APP_ENV = os.getenv("APP_ENV", "development")
+APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
+
+try:
+    APP_PORT = int(os.getenv("APP_PORT", "8000"))
+except ValueError as exc:
+    raise RuntimeError("APP_PORT must be an integer.") from exc
+
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5500,http://127.0.0.1:5500",
+    ).split(",")
+    if origin.strip()
+]
+
+if not CORS_ORIGINS:
+    raise RuntimeError("CORS_ORIGINS must contain at least one origin.")
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
