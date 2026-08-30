@@ -52,6 +52,7 @@ Backend 실행 환경은 다음 환경변수를 사용한다.
 | `APP_ENV` | 공개 가능 | 현재 실행 환경 | `development` |
 | `APP_HOST` | 공개 가능 | Backend 서버 실행 주소 | `127.0.0.1` |
 | `APP_PORT` | 공개 가능 | Backend 서버 실행 포트 | `8000` |
+| `APP_TIMEZONE` | 공개 가능 | 출석 및 일일 기능의 서비스 기준 timezone | `Asia/Seoul` |
 | `CORS_ORIGINS` | 공개 가능 | Backend 접근이 허용된 Frontend 주소 목록 | `http://localhost:5500,http://127.0.0.1:5500` |
 | `DATABASE_URL` | 비공개 | PostgreSQL 접속 정보 | 명세서에 작성하지 않음 |
 | `SANDBOX_IMAGE` | 운영 설정 | 코드 채점용 Docker 이미지 | 채점 기능 구현 시 확정 |
@@ -158,20 +159,153 @@ Frontend는 다음 작업을 담당한다.
 
 ## 4. 인증 및 현재 사용자 식별
 
-현재 사용자 식별 방식은 사용자 기능 구현 단계에서 확정한다.
+현재는 회원가입, 로그인 및 JWT가 구현되기 전의 개발 단계다.
 
-```text
-상태: 미확정
-후보: Authorization 헤더 또는 개발용 사용자 헤더
+개발 및 테스트 환경에서는 다음 헤더로 현재 사용자를 임시 식별한다.
+
+```http
+X-User-ID: 00000000-0000-0000-0000-000000000001
 ```
 
-인증 방식이 확정되면 다음 내용을 기록한다.
+### 4.1 적용 환경
 
-- 필요한 요청 헤더
-- 로그인 또는 사용자 식별 과정
-- 인증 실패 응답
-- 역할별 접근 권한
-- 토큰 만료 및 재인증 방법
+- 허용: `APP_ENV=development`, `APP_ENV=test`
+- 차단: 그 외 모든 환경
+
+운영 환경에서는 `X-User-ID`를 보내도 현재 사용자로 인정하지 않고 `401 AUTHENTICATION_REQUIRED`를 반환한다.
+
+이 헤더는 인증 수단이 아니며, 개발 중 `DEV-001` 사용자로 API를 연결하기 위한 임시 식별 장치다.
+
+### 4.2 Backend 처리
+
+1. 실행 환경이 개발 또는 테스트인지 확인한다.
+2. `X-User-ID` 헤더가 있는지 확인한다.
+3. 헤더 값을 UUID로 변환한다.
+4. 해당 UUID의 사용자가 DB에 존재하는지 확인한다.
+5. 확인된 ORM `User` 객체를 현재 요청의 `current_user`로 제공한다.
+6. 보호 API는 요청 Body나 Path의 사용자 ID보다 `current_user.id`를 우선한다.
+
+현재 사용자 식별 로직은 공통 dependency로 분리한다. JWT 도입 후에는 API별 로직을 다시 작성하지 않고 dependency 내부를 Bearer Token 검증 방식으로 교체한다.
+
+### 4.3 Frontend 처리
+
+1. 개발 환경에서만 현재 개발용 사용자의 UUID를 `X-User-ID` 헤더로 전달한다.
+2. UUID를 여러 화면에 직접 작성하지 않고 공통 API client 설정에서 관리한다.
+3. `401` 응답을 받으면 현재 사용자 설정을 확인하고 사용자 데이터를 화면에 반영하지 않는다.
+4. 운영 build에는 개발용 사용자 UUID를 포함하지 않는다.
+5. JWT가 도입되면 `X-User-ID`를 제거하고 `Authorization: Bearer <token>`으로 전환한다.
+
+### 4.4 현재 사용자 조회
+
+```http
+GET /me
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+성공 상태 코드는 `200 OK`이며 응답은 `UserResponse`를 사용한다.
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "external_student_id": "DEV-001",
+  "username": "개발용 학습자",
+  "role": "USER",
+  "soft_balance": 1000,
+  "hard_balance": 100,
+  "mileage": 0,
+  "house_level": 1,
+  "wallpaper_item_id": null,
+  "floor_item_id": null,
+  "created_at": "2026-08-30T12:00:00+09:00"
+}
+```
+
+### 4.5 식별 실패 응답
+
+- 헤더 누락
+  - 상태: `401 Unauthorized`
+  - 코드: `CURRENT_USER_ID_REQUIRED`
+- UUID 형식 오류
+  - 상태: `401 Unauthorized`
+  - 코드: `INVALID_CURRENT_USER_ID`
+- DB에 사용자가 없음
+  - 상태: `401 Unauthorized`
+  - 코드: `CURRENT_USER_NOT_FOUND`
+- 운영 환경에서 임시 헤더 사용
+  - 상태: `401 Unauthorized`
+  - 코드: `AUTHENTICATION_REQUIRED`
+
+공통 오류 형식 예시:
+
+```json
+{
+  "error": {
+    "code": "CURRENT_USER_ID_REQUIRED",
+    "message": "X-User-ID 헤더가 필요합니다.",
+    "details": []
+  }
+}
+```
+
+### 4.6 JWT 전환 원칙
+
+```text
+현재: X-User-ID → DB User 조회
+향후: Authorization Bearer Token → JWT sub → DB User 조회
+```
+
+사용자 재화, 역할 등 변경 가능한 값은 토큰이나 Frontend 값을 신뢰하지 않고 DB에서 조회한다.
+
+역할별 권한, 토큰 만료, 재인증 및 로그아웃 정책은 후속 인증 단계에서 확정한다.
+
+### 4.7 역할별 권한 검사
+
+현재 지원 역할은 다음과 같다.
+
+| 역할 | 의미 | 기본 허용 범위 |
+| --- | --- | --- |
+| `USER` | 일반 학습자 | 본인 학습, 출석, 재화 및 게임 기능 |
+| `ADMIN` | 관리자 | 일반 기능 및 향후 관리자 전용 기능 |
+
+Backend는 endpoint가 허용하는 역할 목록을 공통 role guard에 선언한다.
+
+```text
+현재 사용자 식별
+→ DB의 최신 role 확인
+→ endpoint 허용 역할과 비교
+→ 허용 시 처리, 미허용 시 403
+```
+
+역할은 `X-User-ID`, 향후 JWT claim 또는 Frontend 입력값을 그대로 신뢰하지 않고 DB의 `users.role`을 기준으로 한다.
+
+`GET /me`는 `USER`와 `ADMIN`을 허용한다. 정의되지 않은 역할은 `403 INSUFFICIENT_ROLE`을 반환한다.
+
+관리자 전용 endpoint는 향후 다음과 같이 `ADMIN`만 허용한다.
+
+```text
+require_roles("ADMIN")
+```
+
+Frontend에서 관리자 메뉴를 숨기는 것은 편의 기능일 뿐이며, 실제 권한 차단은 항상 Backend에서 수행한다.
+
+#### 401과 403 구분
+
+- `401 Unauthorized`: 현재 사용자를 식별할 수 없음
+- `403 Forbidden`: 사용자는 식별됐지만 endpoint에 필요한 역할이 없음
+
+권한 부족 응답:
+
+```json
+{
+  "error": {
+    "code": "INSUFFICIENT_ROLE",
+    "message": "이 작업을 수행할 권한이 없습니다.",
+    "details": []
+  }
+}
+```
+
+Frontend는 `403`을 받으면 재로그인을 반복하지 않고 권한 부족 안내를 표시한다.
 
 ---
 
@@ -390,15 +524,130 @@ API 성공 후 다시 조회해야 하는 데이터와 화면을 작성한다.
 
 완료된 API:
 
+- `GET /me` 현재 사용자 조회
+- `GET /me/attendance/today` 오늘 출석 여부 조회
 - `GET /users/{user_id}` 사용자 상세 조회
 - `GET /users/external-student-id/availability` 외부 학생 ID 중복 검사
 
 작성 예정 API:
 
 - 사용자 생성
-- 오늘 출석 여부 조회
 - 출석 체크
 - 일일 미션 완료 처리
+
+### `GET /me/attendance/today`
+
+#### 기능
+
+현재 사용자가 서비스 기준 오늘 날짜에 출석했는지 조회한다.
+
+이 API는 출석 기록과 재화를 변경하지 않는다.
+
+#### 연결 화면
+
+- 홈 화면의 오늘 출석 상태
+- 일일 미션 진입 화면
+- 출석 완료 표시 및 연속 출석 일수
+
+#### 인증 및 권한
+
+- 현재 식별 방식: 개발·테스트 환경의 `X-User-ID`
+- 현재 허용 역할: `USER`, `ADMIN`
+- 운영 환경: 향후 JWT 인증으로 전환
+
+#### Backend 처리
+
+1. 공통 현재 사용자 dependency로 사용자를 식별한다.
+2. 서버 현재 시각을 `APP_TIMEZONE`으로 변환해 서비스 기준 날짜를 계산한다.
+3. `(current_user.id, service_today)`에 해당하는 출석 기록을 조회한다.
+4. 기록이 없으면 `checked_in_today: false`, `attendance: null`을 반환한다.
+5. 기록이 있으면 `checked_in_today: true`와 출석 상세를 반환한다.
+6. 클라이언트가 보내는 날짜나 기기 시간을 출석 판정에 사용하지 않는다.
+
+#### Frontend 처리
+
+1. 개발 환경에서는 공통 API client가 `X-User-ID` 헤더를 전달한다.
+2. 화면 진입 또는 로그인 후 오늘 출석 상태가 필요할 때 호출한다.
+3. `checked_in_today`가 `false`이면 미출석 상태를 표시한다.
+4. `checked_in_today`가 `true`이면 `attendance.streak_count`와 일일 미션 완료 여부를 화면에 반영한다.
+5. `attendance`가 `null`일 수 있으므로 필드에 바로 접근하지 않는다.
+6. Frontend 날짜와 Backend 응답 날짜가 달라도 Backend 응답을 기준으로 한다.
+7. `401`은 현재 사용자 식별 실패, `403`은 역할 부족으로 처리한다.
+
+#### HTTP 요청
+
+```http
+GET /me/attendance/today
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+#### Query Parameters
+
+- 없음
+
+#### Request Body
+
+- 요청 본문을 사용하지 않는다.
+
+#### 미출석 응답
+
+- 상태 코드: `200 OK`
+
+```json
+{
+  "checked_in_today": false,
+  "attendance": null
+}
+```
+
+#### 출석 완료 응답
+
+- 상태 코드: `200 OK`
+
+```json
+{
+  "checked_in_today": true,
+  "attendance": {
+    "id": "10000000-0000-0000-0000-000000000001",
+    "user_id": "00000000-0000-0000-0000-000000000001",
+    "check_in_date": "2026-08-31",
+    "streak_count": 3,
+    "daily_quest_completed": false
+  }
+}
+```
+
+#### 성공 응답 필드
+
+- `checked_in_today`
+  - 타입: boolean
+  - 설명: 서비스 기준 오늘 출석 기록의 존재 여부
+- `attendance`
+  - 타입: AttendanceResponse 또는 null
+  - 설명: 오늘 출석 상세이며 미출석이면 `null`
+
+#### 오류 응답
+
+- `401 Unauthorized`
+  - 발생 조건: 현재 사용자 헤더 누락, 잘못된 UUID, 미등록 사용자 또는 운영 환경의 임시 헤더 사용
+  - Frontend 처리: 현재 사용자 설정 또는 인증 상태 확인
+- `403 Forbidden`
+  - 오류 코드: `INSUFFICIENT_ROLE`
+  - 발생 조건: 현재 사용자의 역할이 허용 목록에 없음
+  - Frontend 처리: 권한 부족 안내
+- `500 Internal Server Error`
+  - 발생 조건: 예상하지 못한 서버 또는 DB 오류
+  - Frontend 처리: 미출석으로 간주하지 않고 오류와 재시도 UI 표시
+
+#### 서비스 날짜 정책
+
+- 환경변수: `APP_TIMEZONE`
+- 현재 기본값: `Asia/Seoul`
+- 형식: IANA timezone 이름
+- 날짜 계산: timezone-aware 서버 시각을 설정 timezone으로 변환 후 날짜 추출
+- 서버 OS timezone과 클라이언트 기기 날짜는 판정 기준으로 사용하지 않음
+
+`APP_TIMEZONE`을 변경하면 출석과 향후 일일 제한 기능이 동일한 설정을 사용해야 한다.
 
 ### `GET /users/external-student-id/availability`
 
@@ -1007,3 +1256,5 @@ Backend가 PostgreSQL에 `SELECT 1`을 실행하여 실제 DB 연결 가능 여�
 | 2026-08-30 | `/health` 서버 및 DB 상태 확인 API 명세 추가 | Backend |
 | 2026-08-30 | 사용자 상세 조회 API 및 Frontend 연동 명세 추가 | Backend |
 | 2026-08-30 | 외부 학생 ID 중복 검사 Backend·Frontend 공동 명세 추가 | Backend |
+| 2026-08-31 | 개발용 현재 사용자 식별 및 역할별 권한 검사 명세 추가 | Backend |
+| 2026-08-31 | 오늘 출석 여부 조회 및 서비스 timezone 명세 추가 | Backend |

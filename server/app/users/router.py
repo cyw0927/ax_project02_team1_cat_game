@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -9,16 +9,76 @@ from sqlalchemy.orm import Session
 
 from app.core.exception_handlers import AppException
 from app.core.schemas import ErrorResponse
+from app.core.time import get_service_today
 from app.db.database import get_db
+from app.users.dependencies import ROLE_ADMIN, ROLE_USER, require_roles
 from app.users.models import Attendance, User
 from app.users.schemas import (
     AttendanceCheckInResponse,
     AttendanceResponse,
     ExternalStudentIdAvailabilityResponse,
+    TodayAttendanceResponse,
     UserResponse,
 )
 
 router = APIRouter(tags=["users"])
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "허용되지 않은 사용자 역할",
+        }
+    },
+    summary="현재 사용자 조회",
+)
+def get_me(
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+) -> UserResponse:
+    return UserResponse.model_validate(current_user)
+
+
+@router.get(
+    "/me/attendance/today",
+    response_model=TodayAttendanceResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "허용되지 않은 사용자 역할",
+        },
+    },
+    summary="오늘 출석 여부 조회",
+)
+def get_today_attendance(
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> TodayAttendanceResponse:
+    attendance = db.scalar(
+        select(Attendance).where(
+            Attendance.user_id == current_user.id,
+            Attendance.check_in_date == get_service_today(),
+        )
+    )
+
+    return TodayAttendanceResponse(
+        checked_in_today=attendance is not None,
+        attendance=(
+            AttendanceResponse.model_validate(attendance)
+            if attendance is not None
+            else None
+        ),
+    )
 
 
 @router.get(
@@ -102,7 +162,7 @@ def check_in_attendance(
             message="사용자를 찾을 수 없습니다.",
         )
 
-    today = date.today()
+    today = get_service_today()
     yesterday = today - timedelta(days=1)
     previous_attendance = db.scalar(
         select(Attendance)

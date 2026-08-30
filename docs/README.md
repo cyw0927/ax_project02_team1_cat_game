@@ -8,6 +8,8 @@
 - `product/`: 제품 흐름과 확정 비즈니스 규칙
 - `operations/`: 로컬 실행/테스트/운영 메모
 
+전체 구현 순서와 현재 재개 지점은 [`product/implementation-roadmap.md`](product/implementation-roadmap.md)에서 관리합니다.
+
 기능별 상세 시나리오는 기존 `scenario/` 폴더에서 계속 관리합니다.
 
 ## 역할 구분
