@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
@@ -76,6 +77,40 @@ class UserProficiency(Base):
 
 class TaskAttempt(Base):
     __tablename__ = "task_attempts"
+    __table_args__ = (
+        CheckConstraint(
+            """
+            (
+                context_type = 'LEARNING'
+                AND attendance_id IS NULL
+                AND room_task_id IS NULL
+                AND rank_challenge_task_id IS NULL
+            )
+            OR
+            (
+                context_type = 'DAILY'
+                AND attendance_id IS NOT NULL
+                AND room_task_id IS NULL
+                AND rank_challenge_task_id IS NULL
+            )
+            OR
+            (
+                context_type = 'BATTLE'
+                AND attendance_id IS NULL
+                AND room_task_id IS NOT NULL
+                AND rank_challenge_task_id IS NULL
+            )
+            OR
+            (
+                context_type = 'RANKING'
+                AND attendance_id IS NULL
+                AND room_task_id IS NULL
+                AND rank_challenge_task_id IS NOT NULL
+            )
+            """,
+            name="ck_task_attempts_context",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -88,6 +123,22 @@ class TaskAttempt(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tasks.id"),
     )
+
+    context_type: Mapped[str] = mapped_column(String)
+
+    attendance_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("attendances.id"),
+        nullable=True,
+    )
+    room_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("room_tasks.id"),
+        nullable=True,
+    )
+    rank_challenge_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("rank_challenge_tasks.id"),
+        nullable=True,
+    )
+
     submitted_code: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String)
     is_correct: Mapped[bool | None] = mapped_column(
