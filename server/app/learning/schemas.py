@@ -97,3 +97,39 @@ class TaskAttemptAcceptedResponse(SchemaBase):
     is_correct: None = None
     used_hint: bool
     attempted_at: datetime
+
+
+class TaskAttemptResultResponse(SchemaBase):
+    """현재 사용자가 polling하는 채점 결과."""
+
+    attempt_id: uuid.UUID
+    task_id: uuid.UUID
+    context_type: Literal["LEARNING", "DAILY", "BATTLE", "RANKING"]
+    status: Literal["PENDING", "RUNNING", "SUCCESS", "FAILED"]
+    is_correct: bool | None
+    used_hint: bool
+    attempted_at: datetime
+
+
+class LearningHistoryItemResponse(TaskAttemptResultResponse):
+    """학습 이력 목록에서 공개하는 제출 요약."""
+
+    concept_id: int
+    task_type: str
+    difficulty: str
+
+
+class WeakConceptResponse(SchemaBase):
+    """숙련도가 낮아 복습을 권장하는 개념."""
+
+    concept_id: int
+    name: str
+    proficiency_level: int = Field(ge=0, le=100)
+
+
+class UserProficiencyResponse(SchemaBase):
+    """현재 사용자의 개념별 숙련도."""
+
+    concept_id: int
+    concept_name: str
+    proficiency_level: int = Field(ge=0, le=100)

@@ -1,8 +1,15 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.core.exception_handlers import AppException
@@ -10,14 +17,19 @@ from app.core.schemas import ErrorResponse
 from app.battle.models import RoomParticipant, RoomTask
 from app.db.database import get_db
 from app.learning.models import Concept, Task, TaskAttempt, UserProficiency
+from app.learning.grading_service import process_attempt_grading
 from app.learning.schemas import (
     ConceptResponse,
+    LearningHistoryItemResponse,
     TaskCatalogResponse,
     TaskDetailResponse,
     TaskHintResponse,
     TaskAttemptAcceptedResponse,
     TaskAttemptCreateRequest,
+    TaskAttemptResultResponse,
     TaskSummaryResponse,
+    UserProficiencyResponse,
+    WeakConceptResponse,
 )
 from app.ranking.models import RankChallenge, RankChallengeTask
 from app.users.dependencies import ROLE_ADMIN, ROLE_USER, require_roles
@@ -221,47 +233,86 @@ def get_tasks(
     ]
 
 
-@router.get("/users/{user_id}/proficiency")
+@router.get(
+    "/users/{user_id}/proficiency",
+    response_model=list[UserProficiencyResponse],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "다른 사용자의 숙련도 접근",
+        },
+    },
+    summary="현재 사용자의 개념별 숙련도 조회",
+)
 def get_user_proficiency(
     user_id: uuid.UUID,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
     db: Session = Depends(get_db),
-):
-    if db.get(User, user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+) -> list[UserProficiencyResponse]:
+    if user_id != current_user.id:
+        raise AppException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="USER_ACCESS_DENIED",
+            message="다른 사용자의 숙련도를 조회할 수 없습니다.",
         )
 
     rows = db.execute(
         select(
             Concept.id,
             Concept.name,
-            UserProficiency.proficiency_level,
+            func.coalesce(UserProficiency.proficiency_level, 0),
         )
-        .join(UserProficiency, UserProficiency.concept_id == Concept.id)
-        .where(UserProficiency.user_id == user_id)
+        .outerjoin(
+            UserProficiency,
+            and_(
+                UserProficiency.concept_id == Concept.id,
+                UserProficiency.user_id == user_id,
+            ),
+        )
         .order_by(Concept.id)
     ).all()
 
     return [
-        {
-            "concept_id": concept_id,
-            "concept_name": concept_name,
-            "proficiency_level": proficiency_level,
-        }
+        UserProficiencyResponse(
+            concept_id=concept_id,
+            concept_name=concept_name,
+            proficiency_level=proficiency_level,
+        )
         for concept_id, concept_name, proficiency_level in rows
     ]
 
 
-@router.get("/users/{user_id}/attempts")
+@router.get(
+    "/users/{user_id}/attempts",
+    response_model=list[LearningHistoryItemResponse],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "다른 사용자의 학습 이력 접근",
+        },
+    },
+    summary="현재 사용자의 학습 이력 조회",
+)
 def get_user_attempts(
     user_id: uuid.UUID,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
     db: Session = Depends(get_db),
-):
-    if db.get(User, user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+) -> list[LearningHistoryItemResponse]:
+    if user_id != current_user.id:
+        raise AppException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="USER_ACCESS_DENIED",
+            message="다른 사용자의 학습 이력을 조회할 수 없습니다.",
         )
 
     rows = db.execute(
@@ -271,6 +322,7 @@ def get_user_attempts(
             Task.concept_id,
             Task.type,
             Task.difficulty,
+            TaskAttempt.context_type,
             TaskAttempt.status,
             TaskAttempt.is_correct,
             TaskAttempt.used_hint,
@@ -279,26 +331,30 @@ def get_user_attempts(
         .join(Task, Task.id == TaskAttempt.task_id)
         .where(TaskAttempt.user_id == user_id)
         .order_by(TaskAttempt.attempted_at.desc())
+        .limit(limit)
+        .offset(offset)
     ).all()
 
     return [
-        {
-            "attempt_id": attempt_id,
-            "task_id": task_id,
-            "concept_id": concept_id,
-            "type": task_type,
-            "difficulty": difficulty,
-            "status": attempt_status,
-            "is_correct": is_correct,
-            "used_hint": used_hint,
-            "attempted_at": attempted_at,
-        }
+        LearningHistoryItemResponse(
+            attempt_id=attempt_id,
+            task_id=task_id,
+            concept_id=concept_id,
+            task_type=task_type,
+            difficulty=difficulty,
+            context_type=context_type,
+            status=attempt_status,
+            is_correct=is_correct,
+            used_hint=used_hint,
+            attempted_at=attempted_at,
+        )
         for (
             attempt_id,
             task_id,
             concept_id,
             task_type,
             difficulty,
+            context_type,
             attempt_status,
             is_correct,
             used_hint,
@@ -307,56 +363,120 @@ def get_user_attempts(
     ]
 
 
-@router.get("/attempts/{attempt_id}")
+@router.get(
+    "/users/{user_id}/weak-concepts",
+    response_model=list[WeakConceptResponse],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "다른 사용자의 취약 개념 접근",
+        },
+    },
+    summary="현재 사용자의 취약 개념 추천",
+)
+def get_weak_concepts(
+    user_id: uuid.UUID,
+    limit: int = Query(default=3, ge=1, le=10),
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> list[WeakConceptResponse]:
+    if user_id != current_user.id:
+        raise AppException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="USER_ACCESS_DENIED",
+            message="다른 사용자의 취약 개념을 조회할 수 없습니다.",
+        )
+
+    proficiency_level = func.coalesce(
+        UserProficiency.proficiency_level,
+        0,
+    )
+    rows = db.execute(
+        select(
+            Concept.id,
+            Concept.name,
+            proficiency_level,
+        )
+        .outerjoin(
+            UserProficiency,
+            and_(
+                UserProficiency.user_id == user_id,
+                UserProficiency.concept_id == Concept.id,
+            ),
+        )
+        .where(
+            exists(
+                select(Task.id).where(
+                    Task.concept_id == Concept.id,
+                    Task.is_active.is_(True),
+                )
+            )
+        )
+        .order_by(proficiency_level, Concept.id)
+        .limit(limit)
+    ).all()
+
+    return [
+        WeakConceptResponse(
+            concept_id=concept_id,
+            name=name,
+            proficiency_level=level,
+        )
+        for concept_id, name, level in rows
+    ]
+
+
+@router.get(
+    "/attempts/{attempt_id}",
+    response_model=TaskAttemptResultResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "허용되지 않은 사용자 역할",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "현재 사용자의 제출을 찾을 수 없음",
+        },
+    },
+    summary="코드 제출 채점 결과 조회",
+)
 def get_attempt_result(
     attempt_id: uuid.UUID,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
     db: Session = Depends(get_db),
-):
-    row = db.execute(
-        select(
-            TaskAttempt.id,
-            TaskAttempt.task_id,
-            Task.concept_id,
-            Task.type,
-            Task.difficulty,
-            TaskAttempt.status,
-            TaskAttempt.is_correct,
-            TaskAttempt.used_hint,
-            TaskAttempt.attempted_at,
+) -> TaskAttemptResultResponse:
+    attempt = db.scalar(
+        select(TaskAttempt).where(
+            TaskAttempt.id == attempt_id,
+            TaskAttempt.user_id == current_user.id,
         )
-        .join(Task, Task.id == TaskAttempt.task_id)
-        .where(TaskAttempt.id == attempt_id)
-    ).one_or_none()
+    )
 
-    if row is None:
-        raise HTTPException(
+    if attempt is None:
+        raise AppException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Attempt not found",
+            code="ATTEMPT_NOT_FOUND",
+            message="제출 기록을 찾을 수 없습니다.",
         )
 
-    (
-        found_attempt_id,
-        task_id,
-        concept_id,
-        task_type,
-        difficulty,
-        attempt_status,
-        is_correct,
-        used_hint,
-        attempted_at,
-    ) = row
-
-    return {
-        "attempt_id": found_attempt_id,
-        "task_id": task_id,
-        "concept_id": concept_id,
-        "type": task_type,
-        "difficulty": difficulty,
-        "status": attempt_status,
-        "is_correct": is_correct,
-        "used_hint": used_hint,
-        "attempted_at": attempted_at,
-    }
+    return TaskAttemptResultResponse(
+        attempt_id=attempt.id,
+        task_id=attempt.task_id,
+        context_type=attempt.context_type,
+        status=attempt.status,
+        is_correct=attempt.is_correct,
+        used_hint=attempt.used_hint,
+        attempted_at=attempt.attempted_at,
+    )
 
 
 @router.post(
@@ -385,6 +505,7 @@ def get_attempt_result(
 )
 def submit_attempt(
     payload: TaskAttemptCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
     db: Session = Depends(get_db),
 ) -> TaskAttemptAcceptedResponse:
@@ -431,6 +552,7 @@ def submit_attempt(
         raise
 
     db.refresh(attempt)
+    background_tasks.add_task(process_attempt_grading, attempt.id)
 
     return TaskAttemptAcceptedResponse(
         attempt_id=attempt.id,

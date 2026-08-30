@@ -55,11 +55,11 @@ Backend 실행 환경은 다음 환경변수를 사용한다.
 | `APP_TIMEZONE` | 공개 가능 | 출석 및 일일 기능의 서비스 기준 timezone | `Asia/Seoul` |
 | `CORS_ORIGINS` | 공개 가능 | Backend 접근이 허용된 Frontend 주소 목록 | `http://localhost:5500,http://127.0.0.1:5500` |
 | `DATABASE_URL` | 비공개 | PostgreSQL 접속 정보 | 명세서에 작성하지 않음 |
-| `SANDBOX_IMAGE` | 운영 설정 | 코드 채점용 Docker 이미지 | 채점 기능 구현 시 확정 |
-| `SANDBOX_TIMEOUT_SECONDS` | 운영 설정 | 코드 실행 제한 시간 | 채점 기능 구현 시 확정 |
+| `SANDBOX_IMAGE` | 운영 설정 | 코드 채점용 Docker 이미지 | `cat-game-sandbox:local` |
+| `SANDBOX_TIMEOUT_SECONDS` | 운영 설정 | 코드 실행 제한 시간 | `2`초 |
 | `SANDBOX_MEMORY` | 운영 설정 | Docker 메모리 제한 | `128m` |
 | `SANDBOX_CPUS` | 운영 설정 | Docker CPU 제한 | `0.5` |
-| `SANDBOX_OUTPUT_BYTES` | 운영 설정 | 채점 결과 출력 크기 제한 | 채점 기능 구현 시 확정 |
+| `SANDBOX_OUTPUT_BYTES` | 운영 설정 | 채점 결과 출력 크기 제한 | `4096` bytes |
 | `SANDBOX_MAX_CONCURRENCY` | 운영 설정 | 동시에 실행할 수 있는 채점 수 | `3` |
 
 실제 비밀번호와 API 키는 `server/.env`에만 저장하고 Git에 포함하지 않는다.
@@ -417,10 +417,8 @@ Frontend는 `details`를 사용하여 오류가 발생한 입력 필드에 안�
 |---|---|---|
 | `PENDING` | 제출 저장 및 채점 대기 | 채점 중 화면을 표시한다. |
 | `RUNNING` | 채점 진행 중 | 로딩 상태를 유지한다. |
-| `SUCCESS` | 채점 완료 | 정답 여부와 결과를 표시한다. |
+| `SUCCESS` | 채점 완료(정답 또는 오답) | `is_correct`를 표시한다. |
 | `FAILED` | 채점 처리 실패 | 오류 메시지와 재시도 방법을 표시한다. |
-
-상태 이름은 실제 채점 기능 구현 시 최종 확정한다.
 
 Frontend는 `PENDING` 또는 `RUNNING` 상태일 때 결과 조회 API를 일정 간격으로 호출한다. 호출 간격과 최대 대기 시간은 채점 기능 구현 시 정한다.
 
@@ -1533,6 +1531,68 @@ Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-U
 - 요청 중 제출 버튼 잠금은 UX 보조 수단이며 서버의 중복 방지 정책을 대신하지 않는다.
 - `422`는 필드 오류를 표시하고, `TASK_NOT_FOUND`는 문제 목록을 다시 조회한다.
 
+### `GET /attempts/{attempt_id}`
+
+#### 기능
+
+현재 사용자가 제출한 코드의 채점 상태와 정답 여부를 조회한다. 다른 사용자의
+제출 ID이거나 존재하지 않는 ID이면 구분하지 않고 `404 ATTEMPT_NOT_FOUND`를
+반환한다.
+
+#### 성공 응답
+
+```json
+{
+  "attempt_id": "20000000-0000-0000-0000-000000000001",
+  "task_id": "10000000-0000-0000-0000-000000000001",
+  "context_type": "LEARNING",
+  "status": "SUCCESS",
+  "is_correct": true,
+  "used_hint": false,
+  "attempted_at": "2026-08-31T12:00:00Z"
+}
+```
+
+- `PENDING`, `RUNNING`, `FAILED`에서는 `is_correct = null`이다.
+- `SUCCESS`에서는 `is_correct`가 정답이면 `true`, 오답이면 `false`다.
+- Frontend는 `PENDING` 또는 `RUNNING` 동안 polling하고 `SUCCESS` 또는
+  `FAILED`에서 중단한다.
+
+#### 최초 정답 보상 정책
+
+- 같은 사용자·문제에서 처음 `SUCCESS + is_correct = true`가 된 제출만
+  보상한다. 오답과 이미 정답 처리한 문제의 재제출에는 보상하지 않는다.
+- 힌트를 사용하지 않은 최초 정답은 일반 재화 `100`, 해당 개념 숙련도 `10`을
+  지급한다.
+- 힌트를 사용한 최초 정답은 일반 재화 `50`, 해당 개념 숙련도 `5`를 지급한다.
+- 숙련도는 최대 `100`이며 기존 row가 없으면 생성한다.
+- 채점 완료, 일반 재화 지급, 숙련도 생성·수정은 하나의 transaction이다.
+- 사용자 row를 비관적으로 잠근 상태에서 이전 정답을 조회하므로 동시에 채점이
+  끝나도 한 제출만 최초 정답 보상을 받을 수 있다.
+- transaction commit에 실패하면 채점 결과와 모든 보상 변경을 rollback한다.
+
+### `GET /users/{user_id}/attempts`
+
+현재 사용자의 학습 이력을 최신순으로 조회한다. `limit` 기본값은 `20`, 최대
+`100`이며 `offset` 기본값은 `0`이다. 경로의 `user_id`가 현재 사용자와 다르면
+`403 USER_ACCESS_DENIED`를 반환한다.
+
+응답에는 문제 ID, 개념 ID, 문제 유형·난이도, 풀이 context, 채점 상태,
+정답 여부, 힌트 사용 여부와 제출 시각을 포함한다. `submitted_code`와
+`test_cases`는 포함하지 않는다.
+
+### `GET /users/{user_id}/proficiency`
+
+현재 사용자의 모든 개념별 숙련도를 반환한다. 아직 숙련도 row가 없는 개념은
+`0`으로 반환하며 다른 사용자의 ID에는 `403 USER_ACCESS_DENIED`를 반환한다.
+
+### `GET /users/{user_id}/weak-concepts`
+
+현재 사용자의 숙련도가 낮은 개념부터 추천한다. 활성 문제가 하나 이상 있는
+개념만 대상이며 숙련도 row가 없으면 `0`으로 취급한다. `limit` 기본값은 `3`,
+최대 `10`이다. Frontend는 반환된 `concept_id`로
+`GET /concepts/{concept_id}/tasks`를 호출해 복습 문제를 표시한다.
+
 ---
 
 ## 10. 상점 및 인벤토리 API
@@ -1775,3 +1835,4 @@ Backend가 PostgreSQL에 `SELECT 1`을 실행하여 실제 DB 연결 가능 여�
 | 2026-08-31 | 힌트 조회·사용 API와 `used_hint` 후속 연결 명세 추가 | Backend |
 | 2026-08-31 | 채점용 테스트 케이스 비공개 경계와 회귀 검사 추가 | Backend |
 | 2026-08-31 | context 기반 코드 제출 요청·PENDING 접수 계약 추가 | Backend |
+| 2026-08-31 | Docker 채점 상태 전이 및 사용자별 결과 조회 계약 확정 | Backend·Frontend |

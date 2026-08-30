@@ -6,6 +6,7 @@ import httpx
 
 from app.db.database import get_db
 from app.learning.models import Task, TaskAttempt
+from app.learning import router as learning_router
 from app.main import app
 from app.users.models import User
 
@@ -92,9 +93,12 @@ def post_attempt(db: AttemptSession, payload: dict) -> httpx.Response:
             )
 
     app.dependency_overrides[get_db] = override_get_db
+    original_grading_task = learning_router.process_attempt_grading
+    learning_router.process_attempt_grading = lambda attempt_id: None
     try:
         return asyncio.run(request())
     finally:
+        learning_router.process_attempt_grading = original_grading_task
         app.dependency_overrides.clear()
 
 
