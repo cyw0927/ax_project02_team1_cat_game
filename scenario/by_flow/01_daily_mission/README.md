@@ -131,7 +131,7 @@ Docker 실행 중 DB transaction/row lock을 유지하지 않는다. PENDING 저
 
 ### Worst Case B — 보상 버튼 매크로 연타
 - **방어 로직:** 첫 요청만 지급되고 같은 reward event 재요청은 기존 지급 결과를 반환하도록 설계한다.
-- **주의:** 현재 존재하지 않는 `ATTENDANCES.daily_quest_completed` 같은 컬럼을 이미 있는 것처럼 사용하지 않는다.
+- **주의:** 현재 ERD의 `ATTENDANCES.daily_quest_completed`는 완료 상태 표시용이다. 오늘 배정 문제 집합과 문제별·올클리어 보상 지급 이력을 이 boolean 하나로 대신하지 않는다.
 
 ### Worst Case C — 지급 commit 후 응답 유실
 - **상황:** 서버에서는 balance 증가와 지급 상태가 commit됐지만 Wi-Fi가 끊긴다.

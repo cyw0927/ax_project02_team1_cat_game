@@ -1,5 +1,4 @@
 import uuid
-from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -19,6 +18,10 @@ from app.users.schemas import (
     ExternalStudentIdAvailabilityResponse,
     TodayAttendanceResponse,
     UserResponse,
+)
+from app.users.services import (
+    calculate_next_streak_count,
+    select_daily_task_ids,
 )
 
 router = APIRouter(tags=["users"])
@@ -79,6 +82,33 @@ def get_today_attendance(
             else None
         ),
     )
+
+
+@router.post(
+    "/me/attendance/check-in",
+    response_model=AttendanceCheckInResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "현재 사용자 식별 실패",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "허용되지 않은 사용자 역할",
+        },
+        status.HTTP_409_CONFLICT: {
+            "model": ErrorResponse,
+            "description": "오늘 출석이 이미 완료됨",
+        },
+    },
+    summary="현재 사용자 출석 체크",
+)
+def check_in_current_user(
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> AttendanceCheckInResponse:
+    return _create_attendance_check_in(current_user.id, db)
 
 
 @router.get(
@@ -150,6 +180,8 @@ def get_user(
 @router.post(
     "/users/{user_id}/attendance/check-in",
     response_model=AttendanceCheckInResponse,
+    deprecated=True,
+    summary="사용자 출석 체크(호환용)",
 )
 def check_in_attendance(
     user_id: uuid.UUID,
@@ -162,8 +194,14 @@ def check_in_attendance(
             message="사용자를 찾을 수 없습니다.",
         )
 
+    return _create_attendance_check_in(user_id, db)
+
+
+def _create_attendance_check_in(
+    user_id: uuid.UUID,
+    db: Session,
+) -> AttendanceCheckInResponse:
     today = get_service_today()
-    yesterday = today - timedelta(days=1)
     previous_attendance = db.scalar(
         select(Attendance)
         .where(
@@ -174,17 +212,16 @@ def check_in_attendance(
         .limit(1)
     )
 
-    streak_count = 1
-    if (
-        previous_attendance is not None
-        and previous_attendance.check_in_date == yesterday
-    ):
-        streak_count = previous_attendance.streak_count + 1
+    streak_count = calculate_next_streak_count(
+        previous_attendance,
+        today,
+    )
 
     attendance = Attendance(
         user_id=user_id,
         check_in_date=today,
         streak_count=streak_count,
+        daily_task_ids=select_daily_task_ids(db, user_id),
         daily_quest_completed=False,
     )
     db.add(attendance)
@@ -200,12 +237,17 @@ def check_in_attendance(
         ) from exc
 
     reward_amount = 100
-    db.execute(
-        update(User)
-        .where(User.id == user_id)
-        .values(soft_balance=User.soft_balance + reward_amount)
-    )
-    db.commit()
+    try:
+        db.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(soft_balance=User.soft_balance + reward_amount)
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(attendance)
 
     current_soft_balance = db.scalar(

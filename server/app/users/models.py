@@ -11,8 +11,9 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -74,6 +75,10 @@ class Attendance(Base):
             "check_in_date",
             name="uq_attendances_user_date",
         ),
+        CheckConstraint(
+            "jsonb_typeof(daily_task_ids) = 'array'",
+            name="ck_attendances_daily_task_ids_array",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -86,4 +91,9 @@ class Attendance(Base):
     )
     check_in_date: Mapped[date] = mapped_column(Date)
     streak_count: Mapped[int] = mapped_column(Integer)
+    daily_task_ids: Mapped[list[str]] = mapped_column(
+        JSONB,
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
     daily_quest_completed: Mapped[bool] = mapped_column(Boolean)

@@ -78,7 +78,7 @@
 
 ---
 
-## H-T08. 보상 UPDATE 실패 rollback — NOW 테스트 작성 필요
+## H-T08. 보상 UPDATE 실패 rollback — NOW 자동 테스트 완료
 
 Attendance INSERT 후 balance UPDATE에서 DB 오류를 강제로 발생시킨다.
 

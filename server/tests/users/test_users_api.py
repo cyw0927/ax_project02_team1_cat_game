@@ -1,9 +1,10 @@
 import asyncio
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.core import config
 from app.core.exception_handlers import AppException
@@ -289,17 +290,35 @@ def test_get_today_attendance_returns_attendance_details():
 
 
 class AttendanceSession:
-    def __init__(self, user_id: uuid.UUID) -> None:
+    def __init__(
+        self,
+        user_id: uuid.UUID,
+        previous_attendance: Attendance | None = None,
+        daily_task_ids: list[uuid.UUID] | None = None,
+    ) -> None:
         self.user = build_user(user_id)
-        self.scalar_results = iter((None, 1100))
+        self.scalar_results = iter((previous_attendance, 1100))
+        self.daily_task_ids = daily_task_ids or []
         self.added_attendance: Attendance | None = None
         self.executed_statement = None
+        self.committed = False
+        self.rolled_back = False
 
     def get(self, model, identity):
         return self.user
 
     def scalar(self, statement):
         return next(self.scalar_results)
+
+    def scalars(self, statement):
+        class Result:
+            def __init__(self, values):
+                self.values = values
+
+            def all(self):
+                return self.values
+
+        return Result(self.daily_task_ids)
 
     def add(self, attendance: Attendance) -> None:
         self.added_attendance = attendance
@@ -312,10 +331,130 @@ class AttendanceSession:
         self.executed_statement = statement
 
     def commit(self) -> None:
-        pass
+        self.committed = True
+
+    def rollback(self) -> None:
+        self.rolled_back = True
 
     def refresh(self, attendance: Attendance) -> None:
         pass
+
+
+def post_current_attendance(
+    db: AttendanceSession,
+    header_value: str | None,
+) -> httpx.Response:
+    def override_get_db():
+        yield db
+
+    async def request() -> httpx.Response:
+        transport = httpx.ASGITransport(
+            app=app,
+            raise_app_exceptions=False,
+        )
+        headers = {}
+        if header_value is not None:
+            headers["X-User-ID"] = header_value
+
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            return await client.post(
+                "/me/attendance/check-in",
+                headers=headers,
+            )
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        return asyncio.run(request())
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_current_user_attendance_check_in_creates_attendance_and_reward():
+    user_id = uuid.uuid4()
+    task_ids = [uuid.uuid4() for _ in range(4)]
+    db = AttendanceSession(user_id, daily_task_ids=task_ids)
+
+    response = post_current_attendance(db, str(user_id))
+
+    assert response.status_code == 201
+    assert db.committed is True
+    assert db.rolled_back is False
+    assert db.added_attendance is not None
+    assert db.added_attendance.daily_task_ids == [
+        str(task_id) for task_id in task_ids[:3]
+    ]
+    assert response.json()["attendance"]["user_id"] == str(user_id)
+    assert response.json()["reward_amount"] == 100
+    assert response.json()["current_soft_balance"] == 1100
+
+
+def test_current_user_attendance_check_in_requires_identity():
+    user_id = uuid.uuid4()
+    db = AttendanceSession(user_id)
+
+    response = post_current_attendance(db, None)
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "CURRENT_USER_ID_REQUIRED"
+    assert db.added_attendance is None
+    assert db.committed is False
+
+
+class DuplicateAttendanceSession(AttendanceSession):
+    def flush(self) -> None:
+        raise IntegrityError(
+            "INSERT INTO attendances",
+            {},
+            Exception("uq_attendances_user_date"),
+        )
+
+
+def test_duplicate_attendance_rolls_back_without_reward():
+    user_id = uuid.uuid4()
+    db = DuplicateAttendanceSession(user_id)
+
+    response = post_current_attendance(db, str(user_id))
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == (
+        "ATTENDANCE_ALREADY_CHECKED_IN"
+    )
+    assert db.rolled_back is True
+    assert db.executed_statement is None
+    assert db.committed is False
+
+
+class RewardFailureAttendanceSession(AttendanceSession):
+    def execute(self, statement) -> None:
+        self.executed_statement = statement
+        raise RuntimeError("reward update failed")
+
+
+def test_reward_failure_rolls_back_attendance_transaction():
+    user_id = uuid.uuid4()
+    db = RewardFailureAttendanceSession(user_id)
+
+    response = post_current_attendance(db, str(user_id))
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
+    assert db.rolled_back is True
+    assert db.committed is False
+
+
+def test_attendance_model_has_daily_unique_constraint():
+    constraint_names = {
+        constraint.name
+        for constraint in Attendance.__table__.constraints
+        if constraint.name
+    }
+
+    assert "uq_attendances_user_date" in constraint_names
+    assert "ck_attendances_daily_task_ids_array" in constraint_names
+    assert "daily_task_ids" in Attendance.__table__.columns
 
 
 def test_attendance_check_in_uses_current_orm_columns():
@@ -330,3 +469,19 @@ def test_attendance_check_in_uses_current_orm_columns():
     assert "soft_balance" in str(db.executed_statement)
     assert response.current_soft_balance == 1100
     assert response.attendance.user_id == user_id
+
+
+def test_attendance_check_in_applies_consecutive_streak():
+    user_id = uuid.uuid4()
+    previous_attendance = Attendance(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        check_in_date=get_service_today() - timedelta(days=1),
+        streak_count=3,
+        daily_quest_completed=True,
+    )
+    db = AttendanceSession(user_id, previous_attendance)
+
+    response = check_in_attendance(user_id=user_id, db=db)
+
+    assert response.attendance.streak_count == 4

@@ -13,4 +13,4 @@
 | H-09 조회 | 큰 이력/다른 user 조회 | owner·pagination 상한 | 본인 이력만 표시 |
 | H-10 자정 경계 | 23:59 로그인, 00:01 완료 | 서버가 정의한 check-in 판정 시각 | 귀속 날짜 명시; 판정 기준 `TBD`이면 확정 금지 |
 
-일일 미션과 출석은 별개다. 오프라인 학습 이력 통합을 전제하지 않고 `ATTENDANCES.daily_quest_completed` 같은 존재하지 않는 컬럼을 사용하지 않는다.
+일일 미션과 출석은 별개다. 현재 ERD의 `ATTENDANCES.daily_quest_completed`는 오늘 미션의 완료 상태만 나타내며, 출석 보상 지급 여부나 문제별 보상 지급 이력을 대신하지 않는다.

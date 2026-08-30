@@ -526,14 +526,34 @@ API 성공 후 다시 조회해야 하는 데이터와 화면을 작성한다.
 
 - `GET /me` 현재 사용자 조회
 - `GET /me/attendance/today` 오늘 출석 여부 조회
+- `POST /me/attendance/check-in` 현재 사용자 출석 체크
 - `GET /users/{user_id}` 사용자 상세 조회
 - `GET /users/external-student-id/availability` 외부 학생 ID 중복 검사
 
 작성 예정 API:
 
 - 사용자 생성
-- 출석 체크
-- 일일 미션 완료 처리
+- 일일 미션 완료 처리(오늘 배정 문제 집합과 올클리어 판정 정책 확정 후 작성)
+
+일일 미션 완료 상태는 현재 ERD의
+`ATTENDANCES.daily_quest_completed`에 저장한다. 20개 미만 테이블 제약을
+지키기 위해 별도 일일 미션 테이블을 추가하지 않고, 오늘 배정된 문제 ID
+스냅샷은 같은 출석 row의 `daily_task_ids` JSONB 배열에 저장한다. 채점 로직은
+이 배열에 포함된 문제를 모두 맞혔는지 확인한 뒤 같은 transaction에서 멱등
+상태 전이를 호출한다. 문제 0개인 날은 자동 완료하지 않는다.
+
+Frontend가 완료를 직접 선언하는 API는 제공하지 않는다. 문제 수를 임의로
+가정하거나 실제 제출된 문제만을 전체 문제로 간주하지 않는다. 문제 선정
+규칙과 보상 수치가 확정되면 채점 완료 흐름에서 자동으로 연결한다.
+
+오늘 문제 선정 규칙은 다음과 같다.
+
+- `TASKS.is_active = true`인 문제만 후보로 사용한다.
+- 사용자 숙련도가 낮은 개념을 먼저 선택한다.
+- 숙련도 기록이 없는 개념은 레벨 0으로 취급한다.
+- 동률이면 `concept_id`, `task_id` 순서로 정렬해 결과를 고정한다.
+- 최대 3개를 선택하며 출석 생성 시 `daily_task_ids`에 문자열 UUID 배열로 저장한다.
+- 저장 이후 문제 활성 상태나 숙련도가 바뀌어도 당일 배정 스냅샷은 바꾸지 않는다.
 
 ### `GET /me/attendance/today`
 
@@ -648,6 +668,143 @@ X-User-ID: 00000000-0000-0000-0000-000000000001
 - 서버 OS timezone과 클라이언트 기기 날짜는 판정 기준으로 사용하지 않음
 
 `APP_TIMEZONE`을 변경하면 출석과 향후 일일 제한 기능이 동일한 설정을 사용해야 한다.
+
+### `POST /me/attendance/check-in`
+
+#### 기능
+
+현재 사용자의 오늘 출석 기록을 만들고 일반 재화 100을 지급한다.
+
+#### 인증 및 권한
+
+- 현재 식별 방식: 개발·테스트 환경의 `X-User-ID`
+- 현재 허용 역할: `USER`, `ADMIN`
+- 요청 Body나 Path에서 사용자 ID를 받지 않음
+
+#### Backend 처리
+
+1. 공통 현재 사용자 및 역할 dependency를 통과한다.
+2. `APP_TIMEZONE` 기준 오늘과 어제 날짜를 계산한다.
+3. 가장 최근 과거 출석을 조회한다.
+4. 최근 출석이 어제이면 기존 `streak_count + 1`, 아니면 1로 계산한다.
+5. 활성 문제 중 취약 개념 우선으로 최대 3개를 선정해 `daily_task_ids`에 저장하고, 오늘 출석을 `daily_quest_completed: false`로 생성한다.
+6. DB의 `(user_id, check_in_date)` 고유 제약으로 같은 날 중복 출석을 차단한다.
+7. 출석 INSERT와 `soft_balance + 100`을 같은 transaction에서 처리한다.
+8. 성공하면 출석 상세, 지급량 및 최신 일반 재화를 반환한다.
+
+#### Frontend 처리
+
+1. 개발 환경에서는 공통 API client가 `X-User-ID`를 전달한다.
+2. 출석 버튼 또는 로그인 연동 흐름에서 한 번 호출한다.
+3. `201` 응답의 `attendance`와 `current_soft_balance`로 화면을 갱신한다.
+4. `reward_amount`를 Frontend에서 다시 계산하지 않는다.
+5. `409`이면 이미 출석한 상태로 안내하고 재화를 임의로 증가시키지 않는다.
+6. 요청 중 버튼 중복 클릭을 막되 Backend의 DB 고유 제약을 최종 방어로 사용한다.
+
+#### HTTP 요청
+
+```http
+POST /me/attendance/check-in
+X-User-ID: 00000000-0000-0000-0000-000000000001
+```
+
+#### Request Body
+
+- 요청 본문을 사용하지 않는다.
+
+#### 성공 응답
+
+- 상태 코드: `201 Created`
+
+```json
+{
+  "attendance": {
+    "id": "10000000-0000-0000-0000-000000000001",
+    "user_id": "00000000-0000-0000-0000-000000000001",
+    "check_in_date": "2026-08-31",
+    "streak_count": 3,
+    "daily_quest_completed": false
+  },
+  "reward_amount": 100,
+  "current_soft_balance": 1100
+}
+```
+
+#### 성공 응답 필드
+
+- `attendance`
+  - 타입: AttendanceResponse
+  - 설명: 새로 생성된 오늘 출석 기록
+- `reward_amount`
+  - 타입: integer
+  - 설명: 이번 출석으로 지급된 일반 재화
+- `current_soft_balance`
+  - 타입: integer
+  - 설명: 보상 지급 후 사용자의 일반 재화 잔액
+
+#### 중복 출석 응답
+
+- 상태 코드: `409 Conflict`
+- 오류 코드: `ATTENDANCE_ALREADY_CHECKED_IN`
+
+```json
+{
+  "error": {
+    "code": "ATTENDANCE_ALREADY_CHECKED_IN",
+    "message": "오늘 출석이 이미 완료되었습니다.",
+    "details": []
+  }
+}
+```
+
+#### 중복 출석 및 보상 방지
+
+중복 방지의 최종 기준은 애플리케이션의 사전 조회가 아니라 DB의 다음 고유 제약이다.
+
+```text
+UNIQUE(user_id, check_in_date)
+```
+
+처리 순서는 다음과 같다.
+
+```text
+Attendance INSERT 및 flush
+→ 고유 제약 통과
+→ soft_balance + 100
+→ commit
+```
+
+- 중복 INSERT가 flush에서 실패하면 즉시 rollback하고 `409 ATTENDANCE_ALREADY_CHECKED_IN`을 반환한다.
+- 중복이 확인된 요청에서는 재화 UPDATE를 실행하지 않는다.
+- 보상 UPDATE 또는 commit이 실패하면 transaction 전체를 rollback한다.
+- 출석만 저장되고 보상은 지급되지 않는 부분 성공을 허용하지 않는다.
+- Frontend의 버튼 비활성화는 UX 보조 수단이며 중복 방지의 최종 수단이 아니다.
+- 여러 탭이나 기기의 요청도 동일한 고유 제약과 transaction을 사용한다.
+
+같은 날짜의 두 번째 수동 출석 요청은 현재 `409` 정책을 사용한다. 향후 로그인 자동 출석에서는 이 충돌을 로그인 실패로 전파하지 않고 이미 출석한 정상 no-op으로 변환해야 한다.
+
+#### 기타 오류 응답
+
+- `401 Unauthorized`: 현재 사용자 식별 실패
+- `403 Forbidden`: 허용되지 않은 역할
+- `500 Internal Server Error`: 출석 또는 보상 transaction 처리 실패
+
+#### 연속 출석 계산 정책
+
+- 과거 출석 기록이 없으면 오늘 `streak_count`는 1이다.
+- 가장 최근 과거 출석이 서비스 기준 어제이면 이전 `streak_count + 1`이다.
+- 가장 최근 과거 출석이 이틀 이상 전이면 오늘 `streak_count`는 1로 초기화된다.
+- 어제 날짜는 문자열이나 월 내부 숫자 비교가 아니라 날짜에서 하루를 빼서 계산한다.
+- 따라서 월말, 연말 및 윤년의 2월 29일 경계에서도 같은 규칙을 적용한다.
+- 추가 milestone 보상은 현재 정책에 포함하지 않는다.
+
+Frontend는 연속 출석 일수를 자체 계산하지 않고 Backend 응답의 `attendance.streak_count`를 표시한다.
+
+#### 기존 endpoint 호환 정책
+
+기존 `POST /users/{user_id}/attendance/check-in`은 현재 코드와 개발 도구의 호환을 위해 남겨두지만 OpenAPI에서 deprecated로 표시한다.
+
+Frontend 신규 코드는 반드시 `POST /me/attendance/check-in`을 사용한다. JWT 도입 후에도 URL과 Request Body는 유지하고 현재 사용자 dependency만 교체한다.
 
 ### `GET /users/external-student-id/availability`
 
@@ -1258,3 +1415,6 @@ Backend가 PostgreSQL에 `SELECT 1`을 실행하여 실제 DB 연결 가능 여�
 | 2026-08-30 | 외부 학생 ID 중복 검사 Backend·Frontend 공동 명세 추가 | Backend |
 | 2026-08-31 | 개발용 현재 사용자 식별 및 역할별 권한 검사 명세 추가 | Backend |
 | 2026-08-31 | 오늘 출석 여부 조회 및 서비스 timezone 명세 추가 | Backend |
+| 2026-08-31 | 현재 사용자 출석 체크 API 및 호환 endpoint 정책 추가 | Backend |
+| 2026-08-31 | 연속 출석 계산 정책 및 날짜 경계 테스트 추가 | Backend |
+| 2026-08-31 | 중복 출석·중복 보상 차단 및 rollback 정책 추가 | Backend |
