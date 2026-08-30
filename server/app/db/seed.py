@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from sqlalchemy import select
@@ -5,12 +6,28 @@ from sqlalchemy import select
 from app.cats.models import Cat
 from app.db.database import SessionLocal
 from app.economy.models import Item
-from app.learning.models import Concept
+from app.learning.models import Concept, Task
 from app.users.models import User
 
 
 DEV_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-
+TASK_IDS = {
+    "double_number": uuid.UUID(
+        "10000000-0000-0000-0000-000000000001"
+    ),
+    "is_even": uuid.UUID(
+        "10000000-0000-0000-0000-000000000002"
+    ),
+    "sum_to_n": uuid.UUID(
+        "10000000-0000-0000-0000-000000000003"
+    ),
+    "multiply": uuid.UUID(
+        "10000000-0000-0000-0000-000000000004"
+    ),
+    "find_max": uuid.UUID(
+        "10000000-0000-0000-0000-000000000005"
+    ),
+}
 
 def seed_master_data() -> None:
     db = SessionLocal()
@@ -28,6 +45,171 @@ def seed_master_data() -> None:
         for concept in concepts:
             if db.get(Concept, concept.id) is None:
                 db.add(concept)
+                created_count += 1
+
+        tasks = [
+            Task(
+                id=TASK_IDS["double_number"],
+                concept_id=1,
+                title="숫자를 두 배로 만들기",
+                type="CODE",
+                difficulty="BASIC",
+                description=(
+                    "숫자 하나를 받아 두 배로 반환하는 "
+                    "double_number 함수를 작성하세요."
+                ),
+                template_code=(
+                    "def double_number(number):\n"
+                    "    # 코드를 작성하세요.\n"
+                    "    pass\n"
+                ),
+                test_cases=json.dumps(
+                    {
+                        "function_name": "double_number",
+                        "cases": [
+                            {"args": [3], "expected": 6},
+                            {"args": [0], "expected": 0},
+                            {"args": [-4], "expected": -8},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                hint_text="입력받은 number에 2를 곱해 보세요.",
+                is_active=True,
+            ),
+            Task(
+                id=TASK_IDS["is_even"],
+                concept_id=2,
+                title="짝수 판별하기",
+                type="CODE",
+                difficulty="BASIC",
+                description=(
+                    "정수를 받아 짝수이면 True, 홀수이면 False를 "
+                    "반환하는 is_even 함수를 작성하세요."
+                ),
+                template_code=(
+                    "def is_even(number):\n"
+                    "    # 코드를 작성하세요.\n"
+                    "    pass\n"
+                ),
+                test_cases=json.dumps(
+                    {
+                        "function_name": "is_even",
+                        "cases": [
+                            {"args": [2], "expected": True},
+                            {"args": [7], "expected": False},
+                            {"args": [0], "expected": True},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                hint_text="2로 나눈 나머지가 0인지 확인하세요.",
+                is_active=True,
+            ),
+            Task(
+                id=TASK_IDS["sum_to_n"],
+                concept_id=3,
+                title="1부터 N까지 더하기",
+                type="CODE",
+                difficulty="BASIC",
+                description=(
+                    "양의 정수 n을 받아 1부터 n까지의 합을 반환하는 "
+                    "sum_to_n 함수를 반복문으로 작성하세요."
+                ),
+                template_code=(
+                    "def sum_to_n(n):\n"
+                    "    # 코드를 작성하세요.\n"
+                    "    pass\n"
+                ),
+                test_cases=json.dumps(
+                    {
+                        "function_name": "sum_to_n",
+                        "cases": [
+                            {"args": [1], "expected": 1},
+                            {"args": [5], "expected": 15},
+                            {"args": [10], "expected": 55},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                hint_text="합계를 저장할 변수를 만들고 반복해서 더하세요.",
+                is_active=True,
+            ),
+            Task(
+                id=TASK_IDS["multiply"],
+                concept_id=4,
+                title="두 수를 곱하는 함수",
+                type="CODE",
+                difficulty="BASIC",
+                description=(
+                    "두 수 a와 b를 받아 곱한 값을 반환하는 "
+                    "multiply 함수를 작성하세요."
+                ),
+                template_code=(
+                    "def multiply(a, b):\n"
+                    "    # 코드를 작성하세요.\n"
+                    "    pass\n"
+                ),
+                test_cases=json.dumps(
+                    {
+                        "function_name": "multiply",
+                        "cases": [
+                            {"args": [2, 3], "expected": 6},
+                            {"args": [0, 10], "expected": 0},
+                            {"args": [-2, 4], "expected": -8},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                hint_text="함수의 두 매개변수 a와 b를 곱해 반환하세요.",
+                is_active=True,
+            ),
+            Task(
+                id=TASK_IDS["find_max"],
+                concept_id=5,
+                title="리스트에서 최댓값 찾기",
+                type="CODE",
+                difficulty="BASIC",
+                description=(
+                    "숫자 리스트를 받아 가장 큰 값을 반환하는 "
+                    "find_max 함수를 작성하세요."
+                ),
+                template_code=(
+                    "def find_max(numbers):\n"
+                    "    # 코드를 작성하세요.\n"
+                    "    pass\n"
+                ),
+                test_cases=json.dumps(
+                    {
+                        "function_name": "find_max",
+                        "cases": [
+                            {
+                                "args": [[1, 3, 2]],
+                                "expected": 3,
+                            },
+                            {
+                                "args": [[-5, -2, -9]],
+                                "expected": -2,
+                            },
+                            {
+                                "args": [[7]],
+                                "expected": 7,
+                            },
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                hint_text=(
+                    "첫 번째 값을 기준으로 잡고 나머지 값과 "
+                    "차례대로 비교해 보세요."
+                ),
+                is_active=True,
+            ),
+        ]
+
+        for task in tasks:
+            if db.get(Task, task.id) is None:
+                db.add(task)
                 created_count += 1
 
         items = [
