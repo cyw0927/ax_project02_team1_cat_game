@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.exception_handlers import register_exception_handlers
 from app.battle.router import router as battle_router
 from app.cats.router import router as cats_router
 from app.economy.router import router as economy_router
@@ -10,6 +11,8 @@ from app.ranking.router import router as ranking_router
 from app.users.router import router as users_router
 
 app = FastAPI(title="Programming Learning Cat Game API")
+
+register_exception_handlers(app)
 
 # Development-only browser origins used by the playable prototype.
 # Keep this list narrow instead of allowing every origin.
