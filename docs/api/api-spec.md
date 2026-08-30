@@ -1593,6 +1593,25 @@ Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-U
 최대 `10`이다. Frontend는 반환된 `concept_id`로
 `GET /concepts/{concept_id}/tasks`를 호출해 복습 문제를 표시한다.
 
+### Frontend 학습 화면 연동
+
+정적 prototype은 다음 순서로 학습 API를 사용한다.
+
+1. Debug에서 연결한 개발 사용자 UUID를 모든 인증 요청의 `X-User-ID`로 보낸다.
+2. `GET /concepts`로 개념 선택지를 구성한다.
+3. `GET /concepts/{concept_id}/tasks`로 문제 목록을 구성하고
+   `is_locked = true`인 항목은 선택할 수 없게 표시한다.
+4. `GET /tasks/{task_id}`의 설명과 template code를 편집기에 표시한다.
+5. 힌트 버튼을 누르면 `POST /tasks/{task_id}/hint`를 호출하고 이후 제출의
+   `used_hint`를 `true`로 유지한다.
+6. `POST /attempts`에는 `user_id`를 넣지 않고 `context_type = LEARNING`,
+   문제 ID, 코드, 힌트 사용 여부만 보낸다.
+7. `GET /attempts/{attempt_id}`를 750ms 간격으로 최대 12초 동안 polling한다.
+8. `SUCCESS`에서 정답·오답을 표시하고 사용자 상세와 숙련도를 다시 조회한다.
+9. `FAILED`, 네트워크 오류 또는 polling 지연 시 사용자가 결과 조회를 다시
+   시도할 수 있는 버튼을 표시한다. GET 요청은 일시적인 서버·네트워크 오류에
+   한해 한 번 자동 재시도한다.
+
 ---
 
 ## 10. 상점 및 인벤토리 API

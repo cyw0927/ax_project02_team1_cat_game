@@ -38,7 +38,9 @@ prototype/
 
 ## 실제 FastAPI 연결
 
-- 학습: `GET /tasks`, `POST /attempts` (`GET /attempts/{attempt_id}` 함수 포함)
+- 학습: 개념 목록 → 개념별 문제 → 문제 상세 → 힌트 → 제출 → 결과 polling
+- 인증 학습 요청은 Debug에서 연결한 UUID를 `X-User-ID` 헤더로 전송
+- 정답 완료 후 사용자 일반 재화와 개념 숙련도를 다시 조회해 화면 갱신
 - 상점: `GET /items`, `POST /shop/buy`
 - 인벤토리: `GET /users/{user_id}/inventory` 함수 포함
 - 하우징: 조회, 가구 배치/이동/삭제, wallpaper/floor 적용 함수 포함
@@ -57,6 +59,5 @@ UUID가 없으면 로컬 스타터 주황 고양이 한 마리를 즉시 표시�
 - 가챠 API, 확률, 비용 (현재 화면은 재화 차감·DB 저장 없는 명시적 DEMO 흐름)
 - JWT와 회원가입
 - 랭킹·승급전 최종 규칙 일부
-- 학습 채점 worker (`PENDING`이 유지될 수 있음)
 
 DEMO 버튼은 실제 재화나 DB를 변경하지 않습니다. 미확정 경제·가챠·하우스 규칙도 임의로 확정하지 않습니다.
