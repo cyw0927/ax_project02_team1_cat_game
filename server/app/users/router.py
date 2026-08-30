@@ -1,49 +1,105 @@
 import uuid
 from datetime import date, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.exception_handlers import AppException
+from app.core.schemas import ErrorResponse
 from app.db.database import get_db
 from app.users.models import Attendance, User
+from app.users.schemas import (
+    AttendanceCheckInResponse,
+    AttendanceResponse,
+    ExternalStudentIdAvailabilityResponse,
+    UserResponse,
+)
 
 router = APIRouter(tags=["users"])
 
 
-@router.get("/users/{user_id}")
-def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
+@router.get(
+    "/users/external-student-id/availability",
+    response_model=ExternalStudentIdAvailabilityResponse,
+    responses={
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "model": ErrorResponse,
+            "description": "외부 학생 ID 입력값 검증 실패",
+        }
+    },
+    summary="외부 학생 ID 사용 가능 여부 확인",
+)
+def check_external_student_id_availability(
+    external_student_id: Annotated[
+        str,
+        Query(
+            min_length=1,
+            max_length=100,
+            pattern=r"^.*\S.*$",
+        ),
+    ],
+    db: Session = Depends(get_db),
+) -> ExternalStudentIdAvailabilityResponse:
+    normalized_external_student_id = external_student_id.strip()
+
+    existing_user_id = db.scalar(
+        select(User.id)
+        .where(
+            User.external_student_id
+            == normalized_external_student_id
+        )
+        .limit(1)
+    )
+
+    return ExternalStudentIdAvailabilityResponse(
+        external_student_id=normalized_external_student_id,
+        is_available=existing_user_id is None,
+    )
+
+
+@router.get(
+    "/users/{user_id}",
+    response_model=UserResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "사용자를 찾을 수 없음",
+        }
+    },
+    summary="사용자 상세 조회",
+)
+def get_user(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> UserResponse:
     user = db.get(User, user_id)
 
     if user is None:
-        raise HTTPException(
+        raise AppException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            code="USER_NOT_FOUND",
+            message="사용자를 찾을 수 없습니다.",
         )
 
-    return {
-        "id": user.id,
-        "username": user.username,
-        "role": user.role,
-        "balance": user.balance,
-        "mileage": user.mileage,
-        "house_level": user.house_level,
-        "wallpaper_item_id": user.wallpaper_item_id,
-        "floor_item_id": user.floor_item_id,
-        "created_at": user.created_at,
-    }
+    return UserResponse.model_validate(user)
 
 
-@router.post("/users/{user_id}/attendance/check-in")
+@router.post(
+    "/users/{user_id}/attendance/check-in",
+    response_model=AttendanceCheckInResponse,
+)
 def check_in_attendance(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
-):
+) -> AttendanceCheckInResponse:
     if db.get(User, user_id) is None:
-        raise HTTPException(
+        raise AppException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            code="USER_NOT_FOUND",
+            message="사용자를 찾을 수 없습니다.",
         )
 
     today = date.today()
@@ -69,6 +125,7 @@ def check_in_attendance(
         user_id=user_id,
         check_in_date=today,
         streak_count=streak_count,
+        daily_quest_completed=False,
     )
     db.add(attendance)
 
@@ -76,42 +133,45 @@ def check_in_attendance(
         db.flush()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
+        raise AppException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Attendance already checked in today",
+            code="ATTENDANCE_ALREADY_CHECKED_IN",
+            message="오늘 출석이 이미 완료되었습니다.",
         ) from exc
 
     reward_amount = 100
     db.execute(
         update(User)
         .where(User.id == user_id)
-        .values(balance=User.balance + reward_amount)
+        .values(soft_balance=User.soft_balance + reward_amount)
     )
     db.commit()
     db.refresh(attendance)
 
-    current_balance = db.scalar(
-        select(User.balance).where(User.id == user_id)
+    current_soft_balance = db.scalar(
+        select(User.soft_balance).where(User.id == user_id)
     )
 
-    return {
-        "attendance_id": attendance.id,
-        "check_in_date": attendance.check_in_date,
-        "streak_count": attendance.streak_count,
-        "reward_amount": reward_amount,
-        "current_balance": current_balance,
-    }
+    return AttendanceCheckInResponse(
+        attendance=AttendanceResponse.model_validate(attendance),
+        reward_amount=reward_amount,
+        current_soft_balance=current_soft_balance,
+    )
 
 
-@router.get("/users/{user_id}/attendances")
+@router.get(
+    "/users/{user_id}/attendances",
+    response_model=list[AttendanceResponse],
+)
 def get_user_attendances(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
-):
+) -> list[AttendanceResponse]:
     if db.get(User, user_id) is None:
-        raise HTTPException(
+        raise AppException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            code="USER_NOT_FOUND",
+            message="사용자를 찾을 수 없습니다.",
         )
 
     attendances = db.scalars(
@@ -120,11 +180,4 @@ def get_user_attendances(
         .order_by(Attendance.check_in_date.desc())
     ).all()
 
-    return [
-        {
-            "id": attendance.id,
-            "check_in_date": attendance.check_in_date,
-            "streak_count": attendance.streak_count,
-        }
-        for attendance in attendances
-    ]
+    return [AttendanceResponse.model_validate(item) for item in attendances]

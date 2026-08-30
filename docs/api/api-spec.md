@@ -386,18 +386,378 @@ API 성공 후 다시 조회해야 하는 데이터와 화면을 작성한다.
 
 ## 8. 사용자 및 출석 API
 
-```text
-상태: 작성 예정
-```
+상태: 진행 중
 
-포함할 API:
+완료된 API:
+
+- `GET /users/{user_id}` 사용자 상세 조회
+- `GET /users/external-student-id/availability` 외부 학생 ID 중복 검사
+
+작성 예정 API:
 
 - 사용자 생성
-- 사용자 조회
-- 외부 학생 ID 중복 검사
 - 오늘 출석 여부 조회
 - 출석 체크
 - 일일 미션 완료 처리
+
+### `GET /users/external-student-id/availability`
+
+#### 기능
+
+사용자 생성 전에 외부 학생 ID가 이미 등록되어 있는지 확인한다.
+
+중복 여부는 `users.external_student_id`의 고유 제약과 동일하게 대소문자를 구분하여 판정한다.
+
+#### 연결 화면
+
+- 회원가입 또는 사용자 등록 화면
+- 외부 학생 ID 입력 필드의 중복 확인 상태
+
+#### 인증 및 권한
+
+- 현재 인증 필요 여부: 없음
+- 현재 허용 역할: 모든 사용자
+- 남용 방지: 인증 및 요청 횟수 제한 도입 시 함께 적용 예정
+
+#### Backend 처리
+
+1. Query Parameter의 `external_student_id`가 1자 이상 100자 이하이며 공백만으로 구성되지 않았는지 검증한다.
+2. 값의 앞뒤 공백을 제거한다.
+3. 정규화한 값과 정확히 일치하는 `users.external_student_id`를 조회한다.
+4. 일치하는 사용자가 없으면 `is_available: true`, 있으면 `is_available: false`를 반환한다.
+5. 중복인 경우에도 정상적인 조회 결과이므로 `409`가 아닌 `200`을 반환한다.
+6. 이 API는 사전 확인 용도이며, 실제 사용자 생성 시에는 DB 고유 제약 위반을 별도로 처리해야 한다.
+
+#### Frontend 처리
+
+1. 사용자가 입력을 마쳤을 때 또는 중복 확인 버튼을 눌렀을 때 호출한다.
+2. Query Parameter는 URL 인코딩하여 전달한다.
+3. 응답의 `external_student_id`를 정규화된 최종 표시값으로 사용한다.
+4. `is_available`이 `true`이면 사용 가능 상태를 표시하고 다음 단계 진행을 허용한다.
+5. `is_available`이 `false`이면 중복 안내를 표시하고 사용자 생성을 차단한다.
+6. 입력값이 변경되면 이전 중복 검사 결과를 무효화한다.
+7. `422` 응답의 `error.details`를 해당 입력 필드에 표시한다.
+
+#### HTTP 요청
+
+```
+GET /users/external-student-id/availability?external_student_id=DEV-001
+```
+
+#### Query Parameters
+
+- `external_student_id`
+  - 타입: string
+  - 필수 여부: 필수
+  - 길이: 1자 이상 100자 이하
+  - 허용 조건: 공백이 아닌 문자를 최소 1개 포함
+  - 정규화: 조회 전에 앞뒤 공백 제거
+  - 비교 방식: 대소문자 구분 정확 일치
+  - 예시: `DEV-001`
+
+#### Request Body
+
+- 요청 본문을 사용하지 않는다.
+
+#### 사용 가능 응답
+
+- 상태 코드: `200 OK`
+
+```
+{
+  "external_student_id": "NEW-001",
+  "is_available": true
+}
+```
+
+#### 중복 응답
+
+- 상태 코드: `200 OK`
+
+```
+{
+  "external_student_id": "DEV-001",
+  "is_available": false
+}
+```
+
+#### 성공 응답 필드
+
+- `external_student_id`
+  - 타입: string
+  - nullable: 아니요
+  - 설명: 앞뒤 공백이 제거된 검사 대상 외부 학생 ID
+
+- `is_available`
+  - 타입: boolean
+  - nullable: 아니요
+  - 설명: 새 사용자에게 해당 ID를 사용할 수 있는지 여부
+
+#### 입력값 검증 실패 응답
+
+- 상태 코드: `422 Unprocessable Content`
+- 오류 코드: `VALIDATION_ERROR`
+
+```
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "요청값이 올바르지 않습니다.",
+    "details": [
+      {
+        "field": "query.external_student_id",
+        "message": "String should match pattern '^.*\\S.*$'",
+        "type": "string_pattern_mismatch"
+      }
+    ]
+  }
+}
+```
+
+#### 오류 응답
+
+- `422 Unprocessable Content`
+  - 오류 코드: `VALIDATION_ERROR`
+  - 발생 조건: 값 누락, 길이 초과 또는 공백만 입력
+  - Frontend 처리: 외부 학생 ID 입력 필드에 검증 메시지 표시
+
+- `500 Internal Server Error`
+  - 오류 코드: `INTERNAL_SERVER_ERROR`
+  - 발생 조건: 예상하지 못한 서버 또는 DB 오류
+  - Frontend 처리: 잠시 후 다시 검사하도록 안내
+
+#### 화면 갱신
+
+조회 API이므로 사용자 데이터를 변경하지 않는다.
+
+응답에 따라 외부 학생 ID 입력 필드의 사용 가능 상태만 갱신한다.
+
+#### Frontend 주의사항
+
+- 중복 검사 응답만 믿고 사용자 생성 성공을 가정하지 않는다.
+- 중복 검사 후 실제 생성 전 다른 요청이 같은 ID를 생성할 수 있으므로 생성 API의 중복 오류도 처리한다.
+- 입력값이 변경되면 검사 완료 표시와 제출 가능 상태를 초기화한다.
+- 빠른 연속 입력에서는 이전 요청을 취소하거나 최신 응답만 반영한다.
+
+### `GET /users/{user_id}`
+
+#### 기능
+
+UUID를 사용하여 사용자 상세 정보를 조회한다.
+
+현재 개발 단계에서는 개발용 사용자의 UUID로 API를 테스트한다.
+
+#### 연결 화면
+
+- 사용자 프로필 화면
+- 게임 상단 사용자 정보 영역
+- 보유 재화 표시 영역
+- 하우징 설정 화면
+- 마일리지 및 사용자 진행 상태 표시
+
+#### 인증 및 권한
+
+- 현재 인증 필요 여부: 없음
+- 현재 허용 역할: 모든 사용자
+- 현재 본인 데이터 확인 여부: 구현 예정
+- 권한 검사 구현 단계: 현재 사용자 식별 및 역할별 권한 검사 단계
+
+현재는 개발용 API 확인을 위해 UUID로 직접 조회한다.
+
+인증 기능이 구현되면 다른 사용자의 외부 학생 ID, 재화 및 상세 정보를 조회하지 못하도록 본인 여부를 검사해야 한다.
+
+#### Backend 처리
+
+1. Path Parameter의 `user_id`가 올바른 UUID인지 검증한다.
+2. UUID를 사용하여 `users` 테이블에서 사용자를 조회한다.
+3. 사용자가 존재하지 않으면 `404 USER_NOT_FOUND`를 반환한다.
+4. 사용자가 존재하면 `UserResponse` 형식으로 변환한다.
+5. DB에 존재하는 실제 재화 및 하우스 정보를 반환한다.
+6. 존재하지 않는 `balance` 필드를 사용하지 않고 `soft_balance`와 `hard_balance`를 구분하여 반환한다.
+
+#### Frontend 처리
+
+1. 조회할 사용자 UUID를 Path Parameter로 전달한다.
+2. 요청 중에는 사용자 정보 로딩 상태를 표시한다.
+3. `200` 응답을 받으면 프로필과 재화 정보를 화면에 반영한다.
+4. `wallpaper_item_id` 또는 `floor_item_id`가 `null`이면 기본 벽지와 바닥을 표시한다.
+5. `404` 응답을 받으면 사용자를 찾을 수 없다는 안내를 표시한다.
+6. `422` 응답을 받으면 잘못된 사용자 ID 요청으로 처리한다.
+7. 재화 값은 Frontend에서 계산하지 않고 Backend 응답을 그대로 사용한다.
+
+#### HTTP 요청
+
+```
+GET /users/{user_id}
+```
+
+#### Path Parameters
+
+- `user_id`
+  - 타입: UUID string
+  - 필수 여부: 필수
+  - 설명: 조회할 사용자의 내부 UUID
+  - 예시: `00000000-0000-0000-0000-000000000001`
+
+#### Query Parameters
+
+- 없음
+
+#### Request Body
+
+- 요청 본문을 사용하지 않는다.
+
+#### 성공 응답
+
+- 상태 코드: `200 OK`
+
+```
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "external_student_id": "DEV-001",
+  "username": "개발용 학습자",
+  "role": "USER",
+  "soft_balance": 1000,
+  "hard_balance": 100,
+  "mileage": 0,
+  "house_level": 1,
+  "wallpaper_item_id": null,
+  "floor_item_id": null,
+  "created_at": "2026-08-30T12:00:00+09:00"
+}
+```
+
+#### 성공 응답 필드
+
+- `id`
+  - 타입: UUID string
+  - nullable: 아니요
+  - 설명: Backend에서 사용하는 사용자 내부 식별자
+
+- `external_student_id`
+  - 타입: string
+  - nullable: 아니요
+  - 설명: 외부 학생 관리 시스템의 사용자 식별자
+
+- `username`
+  - 타입: string
+  - nullable: 아니요
+  - 설명: 사용자 이름 또는 닉네임
+
+- `role`
+  - 타입: string
+  - nullable: 아니요
+  - 설명: 사용자의 역할 및 권한
+
+- `soft_balance`
+  - 타입: integer
+  - nullable: 아니요
+  - 설명: 사용자의 일반 재화 보유량
+
+- `hard_balance`
+  - 타입: integer
+  - nullable: 아니요
+  - 설명: 사용자의 특수 재화 보유량
+
+- `mileage`
+  - 타입: integer
+  - nullable: 아니요
+  - 설명: 중복 고양이 또는 아이템 보상에 사용하는 마일리지
+
+- `house_level`
+  - 타입: integer
+  - nullable: 아니요
+  - 설명: 사용자 하우스의 현재 레벨
+
+- `wallpaper_item_id`
+  - 타입: integer 또는 null
+  - nullable: 예
+  - 설명: 현재 적용된 벽지 아이템 ID이며, 없으면 `null`
+
+- `floor_item_id`
+  - 타입: integer 또는 null
+  - nullable: 예
+  - 설명: 현재 적용된 바닥 아이템 ID이며, 없으면 `null`
+
+- `created_at`
+  - 타입: ISO 8601 datetime string
+  - nullable: 아니요
+  - 설명: 사용자 계정 생성 시각
+
+#### 사용자 없음 응답
+
+- 상태 코드: `404 Not Found`
+- 오류 코드: `USER_NOT_FOUND`
+
+```
+{
+  "error": {
+    "code": "USER_NOT_FOUND",
+    "message": "사용자를 찾을 수 없습니다.",
+    "details": []
+  }
+}
+```
+
+#### 잘못된 UUID 응답
+
+- 상태 코드: `422 Unprocessable Content`
+- 오류 코드: `VALIDATION_ERROR`
+
+```
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "요청값이 올바르지 않습니다.",
+    "details": [
+      {
+        "field": "path.user_id",
+        "message": "Input should be a valid UUID",
+        "type": "uuid_parsing"
+      }
+    ]
+  }
+}
+```
+
+#### 오류 응답
+
+- `404 Not Found`
+  - 오류 코드: `USER_NOT_FOUND`
+  - 발생 조건: 해당 UUID의 사용자가 존재하지 않음
+  - Frontend 처리: 사용자를 찾을 수 없다는 안내 표시
+
+- `422 Unprocessable Content`
+  - 오류 코드: `VALIDATION_ERROR`
+  - 발생 조건: `user_id`가 UUID 형식이 아님
+  - Frontend 처리: 잘못된 사용자 ID 요청으로 처리
+
+- `500 Internal Server Error`
+  - 오류 코드: `INTERNAL_SERVER_ERROR`
+  - 발생 조건: 예상하지 못한 서버 내부 오류
+  - Frontend 처리: 잠시 후 다시 시도하도록 안내
+
+#### 화면 갱신
+
+조회 API이므로 사용자 데이터를 변경하지 않는다.
+
+성공 응답을 받으면 다음 화면 정보를 응답값으로 갱신한다.
+
+- 사용자 이름
+- 역할
+- 일반 재화
+- 특수 재화
+- 마일리지
+- 하우스 레벨
+- 벽지 및 바닥 상태
+
+#### Frontend 주의사항
+
+- 재화와 마일리지는 Frontend에서 임의로 변경하거나 계산하지 않는다.
+- `wallpaper_item_id`와 `floor_item_id`의 `null` 상태를 처리한다.
+- `external_student_id`는 다른 사용자에게 불필요하게 노출하지 않는다.
+- 현재는 개발용 UUID 조회 방식이며 인증 구현 후 본인 여부를 확인해야 한다.
+- 다른 사용자 화면에는 `UserSummaryResponse`만 사용하고 상세 재화 정보는 노출하지 않는다.
 
 ---
 
@@ -645,3 +1005,5 @@ Backend가 PostgreSQL에 `SELECT 1`을 실행하여 실제 DB 연결 가능 여�
 | 2026-08-30 | 공통 오류 응답 및 Frontend 오류 처리 규칙 추가 | Backend |
 | 2026-08-30 | 실행 환경변수, CORS 정책 및 Frontend 연동 주소 추가 | Backend |
 | 2026-08-30 | `/health` 서버 및 DB 상태 확인 API 명세 추가 | Backend |
+| 2026-08-30 | 사용자 상세 조회 API 및 Frontend 연동 명세 추가 | Backend |
+| 2026-08-30 | 외부 학생 ID 중복 검사 Backend·Frontend 공동 명세 추가 | Backend |

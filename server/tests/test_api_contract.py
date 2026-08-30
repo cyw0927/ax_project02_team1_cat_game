@@ -34,9 +34,9 @@ def test_concurrency_sensitive_tables_have_database_constraints():
         if constraint.name
     }
 
-    assert "uq_room_participant_user" in constraint_names
-    assert "uq_room_task_task" in constraint_names
-    assert "uq_room_task_order" in constraint_names
-    assert "uq_ranking_participant_user" in constraint_names
-    assert "uq_rank_challenge_task" in constraint_names
-    assert "uq_rank_challenge_task_order" in constraint_names
+    assert "uq_room_participants_room_user" in constraint_names
+    assert "uq_room_tasks_room_task" in constraint_names
+    assert "uq_room_tasks_room_order" in constraint_names
+    assert "uq_ranking_participants_group_user" in constraint_names
+    assert "uq_rank_challenge_tasks_challenge_task" in constraint_names
+    assert "uq_rank_challenge_tasks_challenge_order" in constraint_names

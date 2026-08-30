@@ -112,7 +112,7 @@ async def validation_exception_handler(
     ]
 
     return create_error_response(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         code="VALIDATION_ERROR",
         message="요청값이 올바르지 않습니다.",
         details=details,
