@@ -1870,22 +1870,116 @@ Body에 `user_id`를 보내지 않는다. 개발·테스트 환경에서는 `X-U
 
 ## 13. 배틀 API
 
-```text
-상태: 작성 예정
+### 공통 정책
+
+- 방 상태는 `WAITING`, `IN_PROGRESS`, `FINISHED` 순서로 변경한다.
+- 정원은 2·4·6·8명 중 하나이며 API는 2 이상 8 이하를 허용한다.
+- 방장은 생성과 동시에 `TEAM_A` 참가자로 등록되고 준비 완료 상태가 된다.
+- 새 참가자는 두 팀의 현재 인원수를 비교해 서버가 `TEAM_A` 또는 `TEAM_B`에
+  자동 배정한다.
+- 방 생성 시 활성 문제를 최대 3개 선택해 `ROOM_TASKS`에 순서를 저장한다.
+- 같은 사용자의 동일 방 재참가는 새 행을 만들지 않고 기존 참가 상태를
+  반환한다.
+
+### `GET /rooms`
+
+공개 방 목록을 반환한다. 각 항목에는 `id`, `title`, `host_user_id`, `status`,
+`max_participants`, `participant_count`가 포함된다.
+
+### `POST /rooms`
+
+현재 사용자를 방장으로 방을 만들며 `X-User-ID`가 필요하다. Body에 사용자 ID를
+보내지 않는다.
+
+```json
+{"title": "파이썬 초급 배틀", "max_participants": 4}
 ```
 
-포함할 API:
+활성 문제가 하나도 없으면 `409 NO_ACTIVE_BATTLE_TASKS`다. 성공 응답은 방
+상세와 자동 배정된 문제·방장 참가 정보를 반환한다.
 
-- 배틀방 생성
-- 배틀방 목록 조회
-- 배틀방 상세 조회
-- 배틀방 참가
-- 준비 상태 변경
-- 배틀 시작
-- 문제 제출
-- 배틀 상태 조회
-- WebSocket 연결
-- 배틀 결과 조회
+### `GET /rooms/{room_id}`
+
+방 상태, 참가자, 팀, 점수와 문제 목록을 반환한다. 문제에는 `test_cases`와
+정답 데이터가 포함되지 않는다. 종료된 방은 `winning_team`을 함께 반환하며
+동점이면 `null`이다.
+
+### `POST /rooms/{room_id}/join`
+
+현재 사용자가 방에 참가한다. 서버는 Room 행을 `FOR UPDATE`로 잠근 뒤 상태,
+중복 참가, 정원과 팀 인원을 확인한다. 정원이 가득 차면 `409 ROOM_FULL`, 이미
+시작했으면 `409 ROOM_NOT_JOINABLE`이다. 기존 참가자는 `rejoined: true`로
+현재 상태를 돌려받는다.
+
+### `PATCH /rooms/{room_id}/ready`
+
+```json
+{"is_ready": true}
+```
+
+현재 참가자의 준비 상태를 변경한다. 대기 상태가 아니면
+`409 READY_STATE_LOCKED`, 참가자가 아니면 `404 ROOM_PARTICIPANT_NOT_FOUND`다.
+
+### `POST /rooms/{room_id}/start`
+
+방장만 실행할 수 있다. 참가자 2명 이상, 전원 준비 완료, 배정 문제 1개 이상을
+모두 확인하고 `IN_PROGRESS`로 변경한다. 방장이 아니면
+`403 ROOM_HOST_REQUIRED`다.
+
+### 배틀 문제 제출
+
+기존 `POST /attempts`를 사용한다.
+
+```json
+{
+  "task_id": "10000000-0000-0000-0000-000000000001",
+  "context_type": "BATTLE",
+  "room_task_id": "44444444-4444-4444-4444-444444444444",
+  "submitted_code": "def answer():\n    return 1",
+  "used_hint": false
+}
+```
+
+현재 사용자가 해당 방 참가자이고 방이 `IN_PROGRESS`이며 문제 연결이 일치할
+때만 제출된다. Docker 비동기 채점 완료 후 같은 참가자·방 문제의 최초 정답에
+100점을 지급한다. 재제출 정답에는 점수를 다시 지급하지 않는다.
+
+참가자 한 명이 방 문제를 모두 맞히면 방을 `FINISHED`로 변경한다. 팀별 점수
+합계가 가장 높은 단일 팀의 모든 참가자에게 일반 재화 200을 지급한다. 방 상태
+전이와 같은 transaction에서 처리하므로 종료·승리 보상은 한 번만 적용된다.
+
+### `GET /rooms/{room_id}/state`
+
+현재 상태, 승리 팀과 참가자별 준비·점수를 반환한다. 연결 복구와 HTTP fallback
+조회에 사용한다.
+
+### `WS /ws/rooms/{room_id}?user_id={current_user_id}`
+
+개발·테스트 환경의 배틀 실시간 연결이다. 방 참가자만 연결할 수 있으며 연결
+직후와 상태 변경 시 다음 메시지를 보낸다.
+
+```json
+{
+  "type": "ROOM_STATE",
+  "data": {
+    "room_id": "55555555-5555-5555-5555-555555555555",
+    "status": "IN_PROGRESS",
+    "winning_team": null,
+    "participants": []
+  }
+}
+```
+
+연결이 끊겨도 DB의 참가·점수 상태는 유지된다. Frontend는 같은 방으로 다시
+연결하고 REST 상세 또는 WebSocket의 최신 snapshot으로 화면을 복구한다.
+
+### Frontend 배틀 처리
+
+- 방 목록에서 참가하거나 새 방을 만들고, 서버가 반환한 팀을 표시한다.
+- 준비·시작 버튼은 현재 참가자와 방장 여부에 따라 활성화한다.
+- 문제 제출은 `BATTLE` context와 `room_task_id`를 사용한다.
+- WebSocket snapshot으로 양 팀의 준비 상태와 점수를 갱신한다.
+- 연결 종료 시 현재 방이 열려 있으면 지연 후 자동 재연결한다.
 
 ---
 

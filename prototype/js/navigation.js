@@ -40,6 +40,10 @@ function requireUser() {
 
 function go(id) {
   if (!document.getElementById(id)) id = 'home';
+  if (id !== 'battle' && state.battleSocket) {
+    state.battleSocket.close();
+    state.battleSocket = null;
+  }
   document.querySelectorAll('.screen').forEach((screen) => {
     screen.classList.toggle('active', screen.id === id);
   });
@@ -48,6 +52,7 @@ function go(id) {
   if (id === 'shop') loadItems();
   if (id === 'house' && state.userId) loadHouse();
   if (id === 'gacha') loadGachaInfo();
+  if (id === 'battle') loadBattleRooms();
 }
 
 async function connect() {
@@ -516,6 +521,177 @@ async function pullGacha(button) {
   }
 }
 
+function renderBattleRooms(rooms) {
+  const container = $('#battleRooms');
+  container.replaceChildren();
+  rooms.forEach((room) => {
+    const button = document.createElement('button');
+    button.className = 'battle-room-row';
+    button.dataset.battleRoom = room.id;
+    const title = document.createElement('b');
+    title.textContent = room.title;
+    const count = document.createElement('span');
+    count.textContent = `${room.participant_count}/${room.max_participants}`;
+    const statusText = document.createElement('small');
+    statusText.textContent = room.status;
+    button.append(title, count, statusText);
+    container.append(button);
+  });
+  if (!rooms.length) container.innerHTML = '<p class="muted">열린 배틀방이 없습니다.</p>';
+}
+
+async function loadBattleRooms() {
+  if (!requireUser()) return;
+  try {
+    renderBattleRooms(await api.rooms());
+    debug('GET /rooms');
+  } catch (error) {
+    $('#battleRooms').textContent = error.message;
+    debug(`배틀방 목록 실패 · ${error.code} · ${error.message}`);
+  }
+}
+
+async function createBattleRoom() {
+  if (!requireUser()) return;
+  const title = $('#battleTitle').value.trim();
+  if (!title) return message('배틀방 이름을 입력하세요.');
+  const button = $('#createBattle');
+  button.disabled = true;
+  try {
+    const room = await api.createRoom(title, Number($('#battleCapacity').value));
+    $('#battleTitle').value = '';
+    await loadBattleRooms();
+    await openBattleRoom(room.id, false);
+    message('배틀방을 만들었어요.');
+  } catch (error) {
+    message(`방 생성 실패: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderBattleRoom(room) {
+  state.battleRoom = room;
+  $('#battleRoomTitle').textContent = room.title;
+  $('#battleStatus').textContent = `${room.status} · ${room.participant_count}/${room.max_participants}명${room.winning_team ? ` · 승리 ${room.winning_team}` : ''}`;
+  const teams = $('#battleParticipants');
+  teams.replaceChildren();
+  ['TEAM_A', 'TEAM_B'].forEach((teamName) => {
+    const team = document.createElement('div');
+    team.className = 'battle-team';
+    const heading = document.createElement('b');
+    heading.textContent = teamName;
+    team.append(heading);
+    room.participants.filter((participant) => participant.team_name === teamName).forEach((participant) => {
+      const row = document.createElement('span');
+      row.textContent = `${participant.is_ready ? '✅' : '⏳'} ${participant.username} · ${participant.current_score}점`;
+      team.append(row);
+    });
+    teams.append(team);
+  });
+  const me = room.participants.find((participant) => participant.user_id === state.userId);
+  $('#battleReady').disabled = !me || room.status !== 'WAITING' || me.is_host;
+  $('#battleReady').textContent = me?.is_ready ? '준비 취소' : '준비 완료';
+  $('#battleReady').dataset.ready = String(!me?.is_ready);
+  $('#battleStart').disabled = !me?.is_host || room.status !== 'WAITING';
+  $('#battleTask').innerHTML = room.tasks.map((task) => `<option value="${task.room_task_id}" data-task-id="${task.task_id}">${task.task_order}. ${task.title}</option>`).join('');
+  const playable = Boolean(me && room.status === 'IN_PROGRESS' && room.tasks.length);
+  $('#battleCode').disabled = !playable;
+  $('#battleSubmit').disabled = !playable;
+  showBattleTask();
+}
+
+function showBattleTask() {
+  const roomTaskId = $('#battleTask').value;
+  const task = state.battleRoom?.tasks.find((row) => row.room_task_id === roomTaskId);
+  $('#battleTaskDescription').textContent = task?.description || '';
+  if (task && !$('#battleCode').value.trim()) $('#battleCode').value = task.template_code;
+}
+
+function connectBattleSocket(roomId) {
+  state.battleSocket?.close();
+  if (!state.userId) return;
+  const wsBase = state.apiBase.replace(/^http/, 'ws');
+  const socket = new WebSocket(`${wsBase}/ws/rooms/${roomId}?user_id=${encodeURIComponent(state.userId)}`);
+  state.battleSocket = socket;
+  socket.onmessage = (event) => {
+    const messageBody = JSON.parse(event.data);
+    if (messageBody.type !== 'ROOM_STATE' || state.battleRoom?.id !== roomId) return;
+    const next = { ...state.battleRoom, ...messageBody.data };
+    renderBattleRoom(next);
+  };
+  socket.onclose = () => {
+    if (state.battleRoom?.id === roomId && $('#battle').classList.contains('active')) {
+      setTimeout(() => connectBattleSocket(roomId), 1500);
+    }
+  };
+}
+
+async function openBattleRoom(roomId, shouldJoin = true) {
+  if (!requireUser()) return;
+  try {
+    if (shouldJoin) await api.joinRoom(roomId);
+    const room = await api.room(roomId);
+    renderBattleRoom(room);
+    connectBattleSocket(roomId);
+    debug(`배틀방 연결 · ${roomId}`);
+  } catch (error) {
+    message(`방 참가 실패: ${error.message}`);
+  }
+}
+
+async function changeBattleReady() {
+  if (!state.battleRoom) return;
+  const button = $('#battleReady');
+  button.disabled = true;
+  try {
+    await api.readyRoom(state.battleRoom.id, button.dataset.ready === 'true');
+    renderBattleRoom(await api.room(state.battleRoom.id));
+  } catch (error) {
+    message(`준비 변경 실패: ${error.message}`);
+  }
+}
+
+async function startBattle() {
+  if (!state.battleRoom) return;
+  try {
+    await api.startRoom(state.battleRoom.id);
+    renderBattleRoom(await api.room(state.battleRoom.id));
+    message('배틀이 시작됐어요!');
+  } catch (error) {
+    message(`시작 실패: ${error.message}`);
+  }
+}
+
+async function submitBattleAttempt() {
+  const option = $('#battleTask').selectedOptions[0];
+  if (!option || !$('#battleCode').value.trim()) return message('코드를 입력하세요.');
+  const button = $('#battleSubmit');
+  button.disabled = true;
+  $('#battleAttemptState').textContent = '채점 중…';
+  try {
+    const accepted = await api.submitAttempt({
+      task_id: option.dataset.taskId,
+      context_type: 'BATTLE',
+      room_task_id: option.value,
+      submitted_code: $('#battleCode').value,
+      used_hint: false,
+    });
+    let result = null;
+    for (let count = 0; count < 16; count += 1) {
+      result = await api.attempt(accepted.attempt_id);
+      if (result.status === 'SUCCESS' || result.status === 'FAILED') break;
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+    $('#battleAttemptState').textContent = result?.is_correct ? '정답! 실시간 점수에 반영됐어요.' : '오답입니다. 코드를 고쳐 다시 도전하세요.';
+    renderBattleRoom(await api.room(state.battleRoom.id));
+  } catch (error) {
+    $('#battleAttemptState').textContent = `${error.message} 다시 시도해 주세요.`;
+  } finally {
+    button.disabled = state.battleRoom?.status !== 'IN_PROGRESS';
+  }
+}
+
 document.addEventListener('click', (event) => {
   const nav = event.target.closest('[data-go]');
   if (nav) return go(nav.dataset.go);
@@ -533,6 +709,8 @@ document.addEventListener('click', (event) => {
   if (remove) return removePlacedObject(remove);
   const gacha = event.target.closest('[data-gacha-count]');
   if (gacha) return pullGacha(gacha);
+  const battleRoom = event.target.closest('[data-battle-room]');
+  if (battleRoom) return openBattleRoom(battleRoom.dataset.battleRoom);
 });
 addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#debugPanel').open) go('home');
@@ -548,6 +726,12 @@ $('#submitAttempt').onclick = submit;
 $('#retryAttempt').onclick = retryAttemptResult;
 $('#loadItems').onclick = loadItems;
 $('#loadHouse').onclick = loadHouse;
+$('#refreshRooms').onclick = loadBattleRooms;
+$('#createBattle').onclick = createBattleRoom;
+$('#battleReady').onclick = changeBattleReady;
+$('#battleStart').onclick = startBattle;
+$('#battleTask').onchange = () => { $('#battleCode').value = ''; showBattleTask(); };
+$('#battleSubmit').onclick = submitBattleAttempt;
 $('#apiBase').value = state.apiBase;
 $('#userId').value = state.userId;
 renderCats(state.cats);

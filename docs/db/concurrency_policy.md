@@ -59,7 +59,14 @@ SELECT * FROM users WHERE id = :user_id FOR UPDATE;
 추가하지 않아 ERD 테이블 수를 19개로 유지합니다.
 
 ### 방 참가
-방 상태, 정원, 참가자 추가를 한 트랜잭션에서 직렬화해야 하므로 Room row에 대한 짧은 `FOR UPDATE`는 허용합니다.
+방 상태, 정원, 참가자 추가와 팀 배정을 한 트랜잭션에서 직렬화해야 하므로
+Room 행을 짧게 `FOR UPDATE`로 잠급니다. 같은 잠금 안에서 중복 참가,
+`participant_count < max_participants`와 양 팀 인원수를 확인합니다.
+
+배틀 정답 점수도 Room 행을 먼저 잠가 동일 문제 중복 점수와 종료 상태 전이를
+직렬화합니다. `IN_PROGRESS -> FINISHED`로 처음 변경한 transaction만 팀별
+점수를 계산하고 승리 보상을 지급합니다. Docker 실행 중에는 이 잠금을 잡지
+않고 채점 결과 저장 시점에만 짧게 사용합니다.
 
 ## Docker 채점 트랜잭션 경계
 

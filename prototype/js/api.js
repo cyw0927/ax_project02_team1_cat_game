@@ -70,4 +70,11 @@ export const api = {
   gachaInfo: () => request('/gacha', { retry: 1 }),
   gachaPull: (count, request_id) => request('/gacha/pull', { method: 'POST', body: JSON.stringify({ count, request_id }) }),
   gachaResult: (requestId) => request(`/gacha/results/${requestId}`, { retry: 1 }),
+  rooms: () => request('/rooms', { retry: 1 }),
+  room: (id) => request(`/rooms/${id}`, { retry: 1 }),
+  createRoom: (title, max_participants) => request('/rooms', { method: 'POST', body: JSON.stringify({ title, max_participants }) }),
+  joinRoom: (id) => request(`/rooms/${id}/join`, { method: 'POST' }),
+  readyRoom: (id, is_ready) => request(`/rooms/${id}/ready`, { method: 'PATCH', body: JSON.stringify({ is_ready }) }),
+  startRoom: (id) => request(`/rooms/${id}/start`, { method: 'POST' }),
+  roomState: (id) => request(`/rooms/${id}/state`, { retry: 1 }),
 };

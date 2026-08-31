@@ -45,6 +45,7 @@ prototype/
 - 인벤토리: `GET /users/{user_id}/inventory` 함수 포함
 - 하우징: Inventory 기반 가구 배치·이동·회수와 wallpaper/floor 적용 UI
 - 가챠: 서버 확률 조회, 유료 재화 1회·10회 뽑기, 고양이·아이템 결과 반영
+- 배틀: 방 생성·참가·팀 배정·준비·시작·문제 제출·WebSocket 점수 갱신
 - 보유 고양이: `GET /users/{user_id}/cats`
 - 스타터: `POST /users/{user_id}/cats/starter`
 - 사용자 재화: `GET /users/{user_id}`
@@ -56,7 +57,6 @@ UUID가 없으면 로컬 스타터 주황 고양이 한 마리를 즉시 표시�
 ## DEMO / 준비중
 
 - 일일 미션 백엔드와 실제 보상
-- 배틀 실시간 점수와 WebSocket
 - JWT와 회원가입
 - 랭킹·승급전 최종 규칙 일부
 

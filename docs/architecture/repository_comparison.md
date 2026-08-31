@@ -48,6 +48,6 @@
 
 1. FastAPI OpenAPI 계약과 공용 `GameClient` 사이의 원격 어댑터 인터페이스를 합의한다.
 2. 사용자/보유 고양이/하우징 조회처럼 이미 구현된 read 흐름부터 연결한다.
-3. 개인 프로토타입의 가챠 DEMO, 선택 고양이 클릭 이동, UI 방향을 공용 PixiJS scene 요구사항으로 이식한다.
+3. 실제 가챠·배틀 API와 선택 고양이 클릭 이동 UI 방향을 공용 PixiJS scene 요구사항으로 이식한다.
 4. 공용 asset catalog와 content catalog에 개인 자산·문구를 등록한다.
 5. Vite smoke + FastAPI contract test를 함께 실행하는 통합 검증을 만든다.

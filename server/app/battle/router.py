@@ -1,360 +1,69 @@
+import asyncio
+import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.battle.models import Room, RoomParticipant, RoomTask
-from app.db.database import get_db
+from app.battle.schemas import (
+    BattleStateResponse,
+    CreateRoomRequest,
+    JoinRoomResponse,
+    ParticipantResponse,
+    ReadyResponse,
+    RoomDetailResponse,
+    RoomStatusResponse,
+    RoomSummaryResponse,
+    RoomTaskResponse,
+    SetReadyRequest,
+)
+from app.core import config
+from app.core.exception_handlers import AppException
+from app.db.database import SessionLocal, get_db
 from app.learning.models import Task
+from app.users.dependencies import ROLE_ADMIN, ROLE_USER, require_roles
 from app.users.models import User
+
 
 router = APIRouter(tags=["battle"])
 
-
-class CreateRoomRequest(BaseModel):
-    title: str
-    host_user_id: uuid.UUID
-    max_participants: int = Field(ge=1)
-
-
-class JoinRoomRequest(BaseModel):
-    user_id: uuid.UUID
-    team_name: str | None = None
+ROOM_WAITING = "WAITING"
+ROOM_IN_PROGRESS = "IN_PROGRESS"
+ROOM_FINISHED = "FINISHED"
+TEAM_A = "TEAM_A"
+TEAM_B = "TEAM_B"
+BATTLE_TASK_LIMIT = 3
 
 
-class SetReadyRequest(BaseModel):
-    is_ready: bool
+def _commit(db: Session) -> None:
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
-class StartRoomRequest(BaseModel):
-    user_id: uuid.UUID
-
-
-class FinishRoomRequest(BaseModel):
-    user_id: uuid.UUID
-
-
-class AssignRoomTaskRequest(BaseModel):
-    user_id: uuid.UUID
-    task_id: uuid.UUID
-    task_order: int = Field(ge=1)
-
-
-class RemoveRoomTaskRequest(BaseModel):
-    user_id: uuid.UUID
-
-
-@router.get("/rooms")
-def get_rooms(db: Session = Depends(get_db)):
-    rooms = db.scalars(select(Room).order_by(Room.title)).all()
-
-    return [
-        {
-            "id": room.id,
-            "title": room.title,
-            "host_user_id": room.host_user_id,
-            "status": room.status,
-            "max_participants": room.max_participants,
-        }
-        for room in rooms
-    ]
-
-
-@router.post("/rooms", status_code=status.HTTP_201_CREATED)
-def create_room(payload: CreateRoomRequest, db: Session = Depends(get_db)):
-    if db.get(User, payload.host_user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Host user not found",
-        )
-
-    title = payload.title.strip()
-    if not title:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Room title must not be empty",
-        )
-
-    room = Room(
-        title=title,
-        host_user_id=payload.host_user_id,
-        status="WAITING",
-        max_participants=payload.max_participants,
-    )
-    db.add(room)
-    db.commit()
-    db.refresh(room)
-
-    return {
-        "id": room.id,
-        "title": room.title,
-        "host_user_id": room.host_user_id,
-        "status": room.status,
-        "max_participants": room.max_participants,
-    }
-
-
-@router.post(
-    "/rooms/{room_id}/participants",
-    status_code=status.HTTP_201_CREATED,
-)
-def join_room(
-    room_id: uuid.UUID,
-    payload: JoinRoomRequest,
-    db: Session = Depends(get_db),
-):
-    if db.get(User, payload.user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    room = db.scalar(
-        select(Room)
-        .where(Room.id == room_id)
-        .with_for_update()
+def _get_room(db: Session, room_id: uuid.UUID, *, lock: bool = False) -> Room:
+    room = (
+        db.get(Room, room_id, with_for_update=True)
+        if lock
+        else db.get(Room, room_id)
     )
     if room is None:
-        raise HTTPException(
+        raise AppException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
+            code="ROOM_NOT_FOUND",
+            message="배틀방을 찾을 수 없습니다.",
         )
-
-    if room.status != "WAITING":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Room is not accepting participants",
-        )
-
-    existing = db.scalar(
-        select(RoomParticipant.id).where(
-            RoomParticipant.room_id == room_id,
-            RoomParticipant.user_id == payload.user_id,
-        )
-    )
-    if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User already joined this room",
-        )
-
-    participant_count = db.scalar(
-        select(func.count(RoomParticipant.id)).where(
-            RoomParticipant.room_id == room_id
-        )
-    )
-    if participant_count >= room.max_participants:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Room is full",
-        )
-
-    team_name = payload.team_name.strip() if payload.team_name else None
-    if team_name == "":
-        team_name = None
-
-    participant = RoomParticipant(
-        room_id=room_id,
-        user_id=payload.user_id,
-        team_name=team_name,
-        current_score=0,
-        is_ready=False,
-    )
-    db.add(participant)
-    db.commit()
-    db.refresh(participant)
-
-    return {
-        "participant_id": participant.id,
-        "room_id": participant.room_id,
-        "user_id": participant.user_id,
-        "team_name": participant.team_name,
-        "current_score": participant.current_score,
-        "is_ready": participant.is_ready,
-    }
+    return room
 
 
-@router.patch("/rooms/{room_id}/participants/{user_id}/ready")
-def set_participant_ready(
-    room_id: uuid.UUID,
-    user_id: uuid.UUID,
-    payload: SetReadyRequest,
-    db: Session = Depends(get_db),
-):
-    room = db.get(Room, room_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
-    if room.status != "WAITING":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ready state can only change while room is waiting",
-        )
-
-    participant = db.scalar(
-        select(RoomParticipant).where(
-            RoomParticipant.room_id == room_id,
-            RoomParticipant.user_id == user_id,
-        )
-    )
-
-    if participant is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room participant not found",
-        )
-
-    participant.is_ready = payload.is_ready
-    db.commit()
-    db.refresh(participant)
-
-    return {
-        "participant_id": participant.id,
-        "room_id": participant.room_id,
-        "user_id": participant.user_id,
-        "is_ready": participant.is_ready,
-    }
-
-
-@router.post("/rooms/{room_id}/start")
-def start_room(
-    room_id: uuid.UUID,
-    payload: StartRoomRequest,
-    db: Session = Depends(get_db),
-):
-    room = db.get(Room, room_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
-    if payload.user_id != room.host_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the room host can start the room",
-        )
-
-    if room.status != "WAITING":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Room is not waiting",
-        )
-
-    room.status = "IN_PROGRESS"
-    db.commit()
-    db.refresh(room)
-
-    return {
-        "id": room.id,
-        "status": room.status,
-    }
-
-
-@router.post("/rooms/{room_id}/finish")
-def finish_room(
-    room_id: uuid.UUID,
-    payload: FinishRoomRequest,
-    db: Session = Depends(get_db),
-):
-    room = db.get(Room, room_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
-    if payload.user_id != room.host_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the room host can finish the room",
-        )
-
-    if room.status != "IN_PROGRESS":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Room is not in progress",
-        )
-
-    room.status = "FINISHED"
-    db.commit()
-    db.refresh(room)
-
-    return {
-        "id": room.id,
-        "status": room.status,
-    }
-
-
-@router.get("/users/{user_id}/rooms")
-def get_user_rooms(
-    user_id: uuid.UUID,
-    db: Session = Depends(get_db),
-):
-    if db.get(User, user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    rows = db.execute(
+def _participant_rows(db: Session, room_id: uuid.UUID):
+    return db.execute(
         select(
-            Room.id,
-            Room.title,
-            Room.host_user_id,
-            Room.status,
-            Room.max_participants,
-            RoomParticipant.team_name,
-            RoomParticipant.current_score,
-            RoomParticipant.is_ready,
-        )
-        .join(RoomParticipant, RoomParticipant.room_id == Room.id)
-        .where(RoomParticipant.user_id == user_id)
-        .order_by(Room.title)
-    ).all()
-
-    return [
-        {
-            "room_id": room_id,
-            "title": title,
-            "host_user_id": host_user_id,
-            "status": room_status,
-            "max_participants": max_participants,
-            "team_name": team_name,
-            "current_score": current_score,
-            "is_ready": is_ready,
-        }
-        for (
-            room_id,
-            title,
-            host_user_id,
-            room_status,
-            max_participants,
-            team_name,
-            current_score,
-            is_ready,
-        ) in rows
-    ]
-
-
-@router.get("/rooms/{room_id}/participants")
-def get_room_participants(
-    room_id: uuid.UUID,
-    db: Session = Depends(get_db),
-):
-    if db.get(Room, room_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
-    rows = db.execute(
-        select(
+            RoomParticipant.id,
             RoomParticipant.user_id,
             User.username,
             RoomParticipant.team_name,
@@ -363,190 +72,411 @@ def get_room_participants(
         )
         .join(User, User.id == RoomParticipant.user_id)
         .where(RoomParticipant.room_id == room_id)
-        .order_by(User.username)
+        .order_by(RoomParticipant.team_name, User.username)
     ).all()
 
+
+def _participants(db: Session, room: Room) -> list[ParticipantResponse]:
     return [
-        {
-            "user_id": user_id,
-            "username": username,
-            "team_name": team_name,
-            "current_score": current_score,
-            "is_ready": is_ready,
-        }
-        for user_id, username, team_name, current_score, is_ready in rows
+        ParticipantResponse(
+            participant_id=participant_id,
+            user_id=user_id,
+            username=username,
+            team_name=team_name,
+            current_score=current_score,
+            is_ready=is_ready,
+            is_host=user_id == room.host_user_id,
+        )
+        for (
+            participant_id,
+            user_id,
+            username,
+            team_name,
+            current_score,
+            is_ready,
+        ) in _participant_rows(db, room.id)
     ]
 
 
-@router.post(
-    "/rooms/{room_id}/tasks",
-    status_code=status.HTTP_201_CREATED,
-)
-def assign_room_task(
-    room_id: uuid.UUID,
-    payload: AssignRoomTaskRequest,
-    db: Session = Depends(get_db),
-):
-    room = db.get(Room, room_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
-    if payload.user_id != room.host_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the room host can assign tasks",
-        )
-
-    if room.status != "WAITING":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Tasks can only be assigned while room is waiting",
-        )
-
-    task = db.scalar(
-        select(Task).where(
-            Task.id == payload.task_id,
-            Task.is_active.is_(True),
-        )
-    )
-    if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Active task not found",
-        )
-
-    duplicate_task = db.scalar(
-        select(RoomTask.id).where(
-            RoomTask.room_id == room_id,
-            RoomTask.task_id == payload.task_id,
-        )
-    )
-    if duplicate_task is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Task is already assigned to this room",
-        )
-
-    duplicate_order = db.scalar(
-        select(RoomTask.id).where(
-            RoomTask.room_id == room_id,
-            RoomTask.task_order == payload.task_order,
-        )
-    )
-    if duplicate_order is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Task order is already used in this room",
-        )
-
-    room_task = RoomTask(
-        room_id=room_id,
-        task_id=payload.task_id,
-        task_order=payload.task_order,
-    )
-    db.add(room_task)
-    db.commit()
-    db.refresh(room_task)
-
-    return {
-        "room_task_id": room_task.id,
-        "room_id": room_task.room_id,
-        "task_id": room_task.task_id,
-        "task_order": room_task.task_order,
-    }
-
-
-@router.delete("/rooms/{room_id}/tasks/{task_id}")
-def remove_room_task(
-    room_id: uuid.UUID,
-    task_id: uuid.UUID,
-    payload: RemoveRoomTaskRequest,
-    db: Session = Depends(get_db),
-):
-    room = db.get(Room, room_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
-    if payload.user_id != room.host_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the room host can remove tasks",
-        )
-
-    if room.status != "WAITING":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Tasks can only be removed while room is waiting",
-        )
-
-    room_task = db.scalar(
-        select(RoomTask).where(
-            RoomTask.room_id == room_id,
-            RoomTask.task_id == task_id,
-        )
-    )
-    if room_task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room task not found",
-        )
-
-    db.delete(room_task)
-    db.commit()
-
-    return {
-        "room_id": room_id,
-        "task_id": task_id,
-        "removed": True,
-    }
-
-
-@router.get("/rooms/{room_id}/tasks")
-def get_room_tasks(
-    room_id: uuid.UUID,
-    db: Session = Depends(get_db),
-):
-    if db.get(Room, room_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-
+def _tasks(db: Session, room_id: uuid.UUID) -> list[RoomTaskResponse]:
     rows = db.execute(
         select(
-            RoomTask.task_order,
+            RoomTask.id,
             Task.id,
-            Task.concept_id,
+            RoomTask.task_order,
+            Task.title,
             Task.type,
             Task.difficulty,
+            Task.description,
             Task.template_code,
         )
         .join(Task, Task.id == RoomTask.task_id)
         .where(RoomTask.room_id == room_id)
         .order_by(RoomTask.task_order)
     ).all()
-
     return [
-        {
-            "task_order": task_order,
-            "task_id": task_id,
-            "concept_id": concept_id,
-            "type": task_type,
-            "difficulty": difficulty,
-            "template_code": template_code,
-        }
+        RoomTaskResponse(
+            room_task_id=room_task_id,
+            task_id=task_id,
+            task_order=task_order,
+            title=title,
+            type=task_type,
+            difficulty=difficulty,
+            description=description,
+            template_code=template_code,
+        )
         for (
-            task_order,
+            room_task_id,
             task_id,
-            concept_id,
+            task_order,
+            title,
             task_type,
             difficulty,
+            description,
             template_code,
         ) in rows
     ]
+
+
+def _winning_team(participants: list[ParticipantResponse]) -> str | None:
+    if not participants:
+        return None
+    scores = {TEAM_A: 0, TEAM_B: 0}
+    for participant in participants:
+        scores[participant.team_name] += participant.current_score
+    if scores[TEAM_A] == scores[TEAM_B]:
+        return None
+    return max(scores, key=scores.get)
+
+
+def _detail(db: Session, room: Room) -> RoomDetailResponse:
+    participants = _participants(db, room)
+    return RoomDetailResponse(
+        id=room.id,
+        title=room.title,
+        host_user_id=room.host_user_id,
+        status=room.status,
+        max_participants=room.max_participants,
+        participant_count=len(participants),
+        participants=participants,
+        tasks=_tasks(db, room.id),
+        winning_team=(
+            _winning_team(participants) if room.status == ROOM_FINISHED else None
+        ),
+    )
+
+
+@router.get("/rooms", response_model=list[RoomSummaryResponse])
+def get_rooms(db: Session = Depends(get_db)) -> list[RoomSummaryResponse]:
+    rows = db.execute(
+        select(
+            Room.id,
+            Room.title,
+            Room.host_user_id,
+            Room.status,
+            Room.max_participants,
+            func.count(RoomParticipant.id),
+        )
+        .outerjoin(RoomParticipant, RoomParticipant.room_id == Room.id)
+        .group_by(Room.id)
+        .order_by(Room.status, Room.title)
+    ).all()
+    return [
+        RoomSummaryResponse(
+            id=room_id,
+            title=title,
+            host_user_id=host_user_id,
+            status=room_status,
+            max_participants=max_participants,
+            participant_count=participant_count,
+        )
+        for room_id, title, host_user_id, room_status, max_participants, participant_count in rows
+    ]
+
+
+@router.post(
+    "/rooms",
+    response_model=RoomDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_room(
+    payload: CreateRoomRequest,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> RoomDetailResponse:
+    task_ids = db.scalars(
+        select(Task.id)
+        .where(Task.is_active.is_(True))
+        .order_by(Task.id)
+        .limit(BATTLE_TASK_LIMIT)
+    ).all()
+    if not task_ids:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="NO_ACTIVE_BATTLE_TASKS",
+            message="배틀에 사용할 활성 문제가 없습니다.",
+        )
+    room = Room(
+        title=payload.title.strip(),
+        host_user_id=current_user.id,
+        status=ROOM_WAITING,
+        max_participants=payload.max_participants,
+    )
+    db.add(room)
+    db.flush()
+    db.add(
+        RoomParticipant(
+            room_id=room.id,
+            user_id=current_user.id,
+            team_name=TEAM_A,
+            current_score=0,
+            is_ready=True,
+        )
+    )
+    for order, task_id in enumerate(task_ids, start=1):
+        db.add(RoomTask(room_id=room.id, task_id=task_id, task_order=order))
+    _commit(db)
+    return _detail(db, room)
+
+
+@router.get("/rooms/{room_id}", response_model=RoomDetailResponse)
+def get_room_detail(room_id: uuid.UUID, db: Session = Depends(get_db)) -> RoomDetailResponse:
+    return _detail(db, _get_room(db, room_id))
+
+
+@router.post(
+    "/rooms/{room_id}/join",
+    response_model=JoinRoomResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def join_room(
+    room_id: uuid.UUID,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> JoinRoomResponse:
+    room = _get_room(db, room_id, lock=True)
+    existing = db.scalar(
+        select(RoomParticipant).where(
+            RoomParticipant.room_id == room_id,
+            RoomParticipant.user_id == current_user.id,
+        )
+    )
+    if existing is not None:
+        participant = next(
+            row for row in _participants(db, room) if row.user_id == current_user.id
+        )
+        return JoinRoomResponse(participant=participant, rejoined=True)
+    if room.status != ROOM_WAITING:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="ROOM_NOT_JOINABLE",
+            message="참가할 수 없는 상태의 배틀방입니다.",
+        )
+    team_counts = dict(
+        db.execute(
+            select(RoomParticipant.team_name, func.count(RoomParticipant.id))
+            .where(RoomParticipant.room_id == room_id)
+            .group_by(RoomParticipant.team_name)
+        ).all()
+    )
+    participant_count = sum(team_counts.values())
+    if participant_count >= room.max_participants:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="ROOM_FULL",
+            message="배틀방 정원이 가득 찼습니다.",
+        )
+    team_name = (
+        TEAM_A
+        if team_counts.get(TEAM_A, 0) <= team_counts.get(TEAM_B, 0)
+        else TEAM_B
+    )
+    participant = RoomParticipant(
+        room_id=room_id,
+        user_id=current_user.id,
+        team_name=team_name,
+        current_score=0,
+        is_ready=False,
+    )
+    db.add(participant)
+    _commit(db)
+    db.refresh(participant)
+    return JoinRoomResponse(
+        participant=ParticipantResponse(
+            participant_id=participant.id,
+            user_id=current_user.id,
+            username=current_user.username,
+            team_name=team_name,
+            current_score=0,
+            is_ready=False,
+            is_host=False,
+        ),
+        rejoined=False,
+    )
+
+
+@router.patch("/rooms/{room_id}/ready", response_model=ReadyResponse)
+def set_participant_ready(
+    room_id: uuid.UUID,
+    payload: SetReadyRequest,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> ReadyResponse:
+    room = _get_room(db, room_id, lock=True)
+    if room.status != ROOM_WAITING:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="READY_STATE_LOCKED",
+            message="대기 중인 방에서만 준비 상태를 변경할 수 있습니다.",
+        )
+    participant = db.scalar(
+        select(RoomParticipant).where(
+            RoomParticipant.room_id == room_id,
+            RoomParticipant.user_id == current_user.id,
+        )
+    )
+    if participant is None:
+        raise AppException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="ROOM_PARTICIPANT_NOT_FOUND",
+            message="배틀방 참가자를 찾을 수 없습니다.",
+        )
+    participant.is_ready = payload.is_ready
+    _commit(db)
+    return ReadyResponse(
+        participant_id=participant.id,
+        room_id=room_id,
+        user_id=current_user.id,
+        is_ready=participant.is_ready,
+    )
+
+
+@router.post("/rooms/{room_id}/start", response_model=RoomStatusResponse)
+def start_room(
+    room_id: uuid.UUID,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> RoomStatusResponse:
+    room = _get_room(db, room_id, lock=True)
+    if room.host_user_id != current_user.id:
+        raise AppException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="ROOM_HOST_REQUIRED",
+            message="방장만 배틀을 시작할 수 있습니다.",
+        )
+    if room.status != ROOM_WAITING:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="ROOM_NOT_WAITING",
+            message="대기 중인 방만 시작할 수 있습니다.",
+        )
+    participants = db.scalars(
+        select(RoomParticipant).where(RoomParticipant.room_id == room_id)
+    ).all()
+    if len(participants) < 2:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="NOT_ENOUGH_PARTICIPANTS",
+            message="배틀 시작에는 두 명 이상이 필요합니다.",
+        )
+    if any(not participant.is_ready for participant in participants):
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="PARTICIPANTS_NOT_READY",
+            message="모든 참가자가 준비해야 합니다.",
+        )
+    task_count = db.scalar(
+        select(func.count(RoomTask.id)).where(RoomTask.room_id == room_id)
+    )
+    if not task_count:
+        raise AppException(
+            status_code=status.HTTP_409_CONFLICT,
+            code="ROOM_TASKS_REQUIRED",
+            message="배틀 문제가 필요합니다.",
+        )
+    room.status = ROOM_IN_PROGRESS
+    _commit(db)
+    return RoomStatusResponse(room_id=room.id, status=room.status)
+
+
+@router.get("/rooms/{room_id}/tasks", response_model=list[RoomTaskResponse])
+def get_room_tasks(
+    room_id: uuid.UUID,
+    current_user: User = Depends(require_roles(ROLE_USER, ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> list[RoomTaskResponse]:
+    _get_room(db, room_id)
+    participant_id = db.scalar(
+        select(RoomParticipant.id).where(
+            RoomParticipant.room_id == room_id,
+            RoomParticipant.user_id == current_user.id,
+        )
+    )
+    if participant_id is None:
+        raise AppException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="ROOM_PARTICIPANT_REQUIRED",
+            message="배틀방 참가자만 문제를 조회할 수 있습니다.",
+        )
+    return _tasks(db, room_id)
+
+
+@router.get("/rooms/{room_id}/state", response_model=BattleStateResponse)
+def get_battle_state(
+    room_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> BattleStateResponse:
+    room = _get_room(db, room_id)
+    participants = _participants(db, room)
+    return BattleStateResponse(
+        room_id=room.id,
+        status=room.status,
+        winning_team=(
+            _winning_team(participants) if room.status == ROOM_FINISHED else None
+        ),
+        participants=participants,
+    )
+
+
+def _websocket_state(room_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+    with SessionLocal() as db:
+        room = db.get(Room, room_id)
+        participant = db.scalar(
+            select(RoomParticipant.id).where(
+                RoomParticipant.room_id == room_id,
+                RoomParticipant.user_id == user_id,
+            )
+        )
+        if room is None or participant is None:
+            return {}
+        return get_battle_state(room_id, db).model_dump(mode="json")
+
+
+@router.websocket("/ws/rooms/{room_id}")
+async def room_websocket(
+    websocket: WebSocket,
+    room_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> None:
+    if config.APP_ENV.lower() not in {"development", "test"}:
+        await websocket.close(code=4401)
+        return
+    initial_state = _websocket_state(room_id, user_id)
+    if not initial_state:
+        await websocket.close(code=4403)
+        return
+    await websocket.accept()
+    previous = ""
+    try:
+        while True:
+            state = _websocket_state(room_id, user_id)
+            serialized = json.dumps(state, sort_keys=True)
+            if serialized != previous:
+                await websocket.send_json({"type": "ROOM_STATE", "data": state})
+                previous = serialized
+            try:
+                await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+            except TimeoutError:
+                continue
+    except WebSocketDisconnect:
+        return

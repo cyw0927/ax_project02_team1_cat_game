@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_sandbox_config
+from app.battle.service import apply_battle_correct_result
 from app.db.database import SessionLocal
 from app.learning.models import Task, TaskAttempt, UserProficiency
 from app.sandbox.executor import SandboxLimits
@@ -126,27 +127,30 @@ def _finish_attempt(
 
         is_first_correct = False
         if status == STATUS_SUCCESS and is_correct is True:
-            user = db.get(User, attempt.user_id, with_for_update=True)
-            if user is None:
-                attempt.status = STATUS_FAILED
-                attempt.is_correct = None
-                _commit(db)
-                return None
+            if attempt.context_type == "BATTLE":
+                is_first_correct = apply_battle_correct_result(db, attempt)
+            else:
+                user = db.get(User, attempt.user_id, with_for_update=True)
+                if user is None:
+                    attempt.status = STATUS_FAILED
+                    attempt.is_correct = None
+                    _commit(db)
+                    return None
 
-            prior_correct_attempt_id = db.scalar(
-                select(TaskAttempt.id)
-                .where(
-                    TaskAttempt.user_id == attempt.user_id,
-                    TaskAttempt.task_id == attempt.task_id,
-                    TaskAttempt.id != attempt.id,
-                    TaskAttempt.status == STATUS_SUCCESS,
-                    TaskAttempt.is_correct.is_(True),
+                prior_correct_attempt_id = db.scalar(
+                    select(TaskAttempt.id)
+                    .where(
+                        TaskAttempt.user_id == attempt.user_id,
+                        TaskAttempt.task_id == attempt.task_id,
+                        TaskAttempt.id != attempt.id,
+                        TaskAttempt.status == STATUS_SUCCESS,
+                        TaskAttempt.is_correct.is_(True),
+                    )
+                    .limit(1)
                 )
-                .limit(1)
-            )
-            is_first_correct = prior_correct_attempt_id is None
-            if is_first_correct:
-                _apply_first_correct_reward(db, attempt=attempt, user=user)
+                is_first_correct = prior_correct_attempt_id is None
+                if is_first_correct:
+                    _apply_first_correct_reward(db, attempt=attempt, user=user)
 
         attempt.status = status
         attempt.is_correct = is_correct

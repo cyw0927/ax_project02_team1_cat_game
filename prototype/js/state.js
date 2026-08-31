@@ -12,6 +12,8 @@ export const state = {
   house: null,
   gachaInfo: null,
   pendingGachaRequest: null,
+  battleRoom: null,
+  battleSocket: null,
 };
 
 export function setUser(apiBase, userId) {

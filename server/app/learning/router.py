@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exception_handlers import AppException
 from app.core.schemas import ErrorResponse
-from app.battle.models import RoomParticipant, RoomTask
+from app.battle.models import Room, RoomParticipant, RoomTask
 from app.db.database import get_db
 from app.learning.models import Concept, Task, TaskAttempt, UserProficiency
 from app.learning.grading_service import process_attempt_grading
@@ -591,7 +591,10 @@ def _attempt_context_exists(
                 RoomTask.id == payload.room_task_id,
                 RoomTask.task_id == payload.task_id,
                 RoomParticipant.user_id == user_id,
+                RoomTask.room_id == Room.id,
+                Room.status == "IN_PROGRESS",
             )
+            .join(Room, Room.id == RoomTask.room_id)
         )
     else:
         context_id = db.scalar(

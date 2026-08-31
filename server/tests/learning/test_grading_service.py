@@ -31,6 +31,8 @@ class FakeAttempt:
     task_id: uuid.UUID
     submitted_code: str
     used_hint: bool = False
+    context_type: str = "LEARNING"
+    room_task_id: uuid.UUID | None = None
     status: str = "PENDING"
     is_correct: bool | None = None
 
