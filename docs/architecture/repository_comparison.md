@@ -42,12 +42,12 @@
 - percentage 이동 좌표와 서버 `position_data`, 공용 격자 좌표 사이 변환 책임을 별도 모듈로 둔다.
 - 백엔드 CORS에 5173을 추가하기 전 팀 실행 방식과 env 정책을 먼저 확정한다.
 - 공용 명명에 맞춰 프론트 개념은 `app/core/domain/game/services` 책임으로 문서화하되, 현재 플레이 가능한 `prototype` 폴더를 성급히 이동하지 않는다.
-- 가챠는 서버 정책/API가 생길 때까지 DEMO로 유지하고 프론트가 가격·확률·당첨 cat_id를 결정하는 구현을 만들지 않는다.
+- 가챠 가격·확률·당첨 결과는 FastAPI 서버가 결정하며 프론트는 결과 표시와 재조회만 담당한다.
 
 ## 권장 통합 순서
 
 1. FastAPI OpenAPI 계약과 공용 `GameClient` 사이의 원격 어댑터 인터페이스를 합의한다.
 2. 사용자/보유 고양이/하우징 조회처럼 이미 구현된 read 흐름부터 연결한다.
-3. 개인 프로토타입의 가챠 DEMO, 선택 고양이 클릭 이동, UI 방향을 공용 PixiJS scene 요구사항으로 이식한다.
+3. 실제 가챠·배틀 API와 선택 고양이 클릭 이동 UI 방향을 공용 PixiJS scene 요구사항으로 이식한다.
 4. 공용 asset catalog와 content catalog에 개인 자산·문구를 등록한다.
 5. Vite smoke + FastAPI contract test를 함께 실행하는 통합 검증을 만든다.

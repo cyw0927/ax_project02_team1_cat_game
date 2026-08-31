@@ -1,0 +1,40 @@
+.house-tools h3 {
+  margin: 16px 0 7px;
+  font-size: 14px;
+}
+
+.house-list {
+  display: grid;
+  gap: 7px;
+}
+
+.house-item {
+  padding: 9px;
+  border: 1px solid #c99868;
+  border-radius: 11px;
+  background: #fffaf1;
+}
+
+.house-item b,
+.house-item small {
+  display: block;
+}
+
+.house-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.house-actions button {
+  padding: 5px 8px;
+  border-radius: 9px;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.house-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}

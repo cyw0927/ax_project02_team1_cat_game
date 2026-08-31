@@ -84,4 +84,67 @@ def test_limits_concurrent_containers_and_applies_security_options(monkeypatch):
         assert options["mem_limit"] == "128m"
         assert options["nano_cpus"] == 500_000_000
         assert options["read_only"] is True
+        assert options["cap_drop"] == ["ALL"]
+        assert options["security_opt"] == ["no-new-privileges"]
+        assert options["stdin_open"] is False
+        assert options["tty"] is False
+
+
+class TimeoutContainer(FakeContainer):
+    def __init__(self, tracker):
+        super().__init__(tracker)
+        self.killed = False
+
+    def reload(self):
+        self.status = "running"
+
+    def kill(self):
+        self.killed = True
+        self.status = "exited"
+        self.tracker["killed"] = True
+
+    def wait(self):
+        return {"StatusCode": 137}
+
+
+class TimeoutContainers(FakeContainers):
+    def run(self, **kwargs):
+        self.tracker["run_options"].append(kwargs)
+        self.tracker["active"] += 1
+        return TimeoutContainer(self.tracker)
+
+
+class TimeoutClient(FakeClient):
+    def __init__(self, tracker):
+        self.containers = TimeoutContainers(tracker)
+
+
+def test_kills_container_after_execution_timeout(monkeypatch):
+    tracker = {
+        "active": 0,
+        "maximum": 0,
+        "lock": threading.Lock(),
+        "run_options": [],
+        "killed": False,
+    }
+    monkeypatch.setattr(
+        executor.docker,
+        "from_env",
+        lambda: TimeoutClient(tracker),
+    )
+
+    result = executor.run_python_code(
+        "while True: pass",
+        image="cat-game-sandbox:local",
+        limits=executor.SandboxLimits(
+            timeout_seconds=0.02,
+            memory="128m",
+            cpus="0.5",
+            output_bytes=1024,
+        ),
+    )
+
+    assert result.timed_out is True
+    assert result.exit_code == 137
+    assert tracker["killed"] is True
 

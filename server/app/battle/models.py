@@ -1,6 +1,12 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,7 +32,11 @@ class Room(Base):
 class RoomParticipant(Base):
     __tablename__ = "room_participants"
     __table_args__ = (
-        UniqueConstraint("room_id", "user_id", name="uq_room_participant_user"),
+        UniqueConstraint(
+            "room_id",
+            "user_id",
+            name="uq_room_participants_room_user",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -40,7 +50,10 @@ class RoomParticipant(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"),
     )
-    team_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    team_name: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
     current_score: Mapped[int] = mapped_column(Integer)
     is_ready: Mapped[bool] = mapped_column(Boolean)
 
@@ -48,8 +61,16 @@ class RoomParticipant(Base):
 class RoomTask(Base):
     __tablename__ = "room_tasks"
     __table_args__ = (
-        UniqueConstraint("room_id", "task_id", name="uq_room_task_task"),
-        UniqueConstraint("room_id", "task_order", name="uq_room_task_order"),
+        UniqueConstraint(
+            "room_id",
+            "task_id",
+            name="uq_room_tasks_room_task",
+        ),
+        UniqueConstraint(
+            "room_id",
+            "task_order",
+            name="uq_room_tasks_room_order",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

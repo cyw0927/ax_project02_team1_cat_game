@@ -16,22 +16,57 @@ DB는 상태 저장과 원자성 보장을 담당하고, 장시간 작업과 실
 ## 현재 적용 예
 
 ### 상점 구매
-잔액 차감은 조건부 UPDATE를 사용합니다.
+구매 idempotency 상태와 잔액·Inventory를 함께 변경하므로 사용자 row를 짧게
+잠급니다. 잠금 후 서버 가격과 `soft_balance >= price`를 확인하고 동일
+transaction에서 차감과 수량 증가를 수행합니다.
 
 ```sql
-UPDATE users
-SET balance = balance - :price
-WHERE id = :user_id
-  AND balance >= :price;
+SELECT id, soft_balance FROM users WHERE id = :user_id FOR UPDATE;
 ```
 
-별도 `FOR UPDATE`로 잔액을 선점하지 않습니다.
+`inventories.last_purchase_request_id`의 UNIQUE 제약과 사용자 row 잠금으로 같은
+요청 ID의 동시 재전송을 한 번만 적용합니다. 외부 I/O 없이 짧은 DB transaction
+안에서 끝냅니다.
 
 ### 출석/중복 보상
 `UNIQUE(user_id, check_in_date)` 같은 DB 제약을 우선합니다.
 
+### 하우징 가구 배치
+같은 가구의 동시 배치 요청이 Inventory 수량을 함께 통과하지 않도록 해당
+`(user_id, item_id)` Inventory 행을 짧게 잠급니다. 잠금 후 현재 배치 개수를
+계산하고 `placed_count < quantity`인 경우에만 `placed_objects`를 추가합니다.
+
+```sql
+SELECT * FROM inventories
+WHERE user_id = :user_id AND item_id = :item_id AND quantity > 0
+FOR UPDATE;
+```
+
+위치 변경과 회수에는 외부 I/O가 없으며 대상 소유권을 같은 transaction에서
+확인합니다.
+
+### 가챠
+1회 또는 10회 보상의 재화 차감, 고양이 지급, 아이템 지급과 중복 마일리지
+전환을 한 transaction에서 처리합니다. 같은 사용자의 동시 요청을 직렬화하기
+위해 사용자 행을 먼저 잠그며, Inventory 행도 조회 시 함께 잠급니다.
+
+```sql
+SELECT * FROM users WHERE id = :user_id FOR UPDATE;
+```
+
+`users.last_gacha_request_id`와 `last_gacha_response`에 마지막 결과를 저장해 같은
+요청 ID의 재전송에는 차감과 지급을 반복하지 않습니다. 별도 이력 테이블은
+추가하지 않아 ERD 테이블 수를 19개로 유지합니다.
+
 ### 방 참가
-방 상태, 정원, 참가자 추가를 한 트랜잭션에서 직렬화해야 하므로 Room row에 대한 짧은 `FOR UPDATE`는 허용합니다.
+방 상태, 정원, 참가자 추가와 팀 배정을 한 트랜잭션에서 직렬화해야 하므로
+Room 행을 짧게 `FOR UPDATE`로 잠급니다. 같은 잠금 안에서 중복 참가,
+`participant_count < max_participants`와 양 팀 인원수를 확인합니다.
+
+배틀 정답 점수도 Room 행을 먼저 잠가 동일 문제 중복 점수와 종료 상태 전이를
+직렬화합니다. `IN_PROGRESS -> FINISHED`로 처음 변경한 transaction만 팀별
+점수를 계산하고 승리 보상을 지급합니다. Docker 실행 중에는 이 잠금을 잡지
+않고 채점 결과 저장 시점에만 짧게 사용합니다.
 
 ## Docker 채점 트랜잭션 경계
 
